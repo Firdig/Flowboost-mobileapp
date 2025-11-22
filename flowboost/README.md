@@ -7,10 +7,10 @@ FlowBost adalah aplikasi yang dirancang untuk meningkatkan produktivitas dan kes
 2. Deskripsi Aplikasi : FlowBoost is a comprehensive productivity application designed to help users manage their time, stay motivated, maintain mental wellness, and achieve their goals. 
 
 3. Kelas-NIM-Nama :
- D-202210370311222-Auliana Yus Nesta Sari 
- D-202210370311233-Okta Ramji Saputra 
- D-202210370311234-Muhammad Yusril Islam 
- A-202210370311249-Muhammad Firdig Haqqy Abdillah
+ D - 202210370311222 - Auliana Yus Nesta Sari - aulianayusnesta
+ D - 202210370311233 - Okta Ramji Saputra - okttaacx
+ D - 202210370311234 - Muhammad Yusril Islam - Atzee7
+ D - 202210370311249 - Muhammad Firdig Haqqy Abdillah - Firdig
   
  
 4. Link Figma : https://www.figma.com/design/DKMYWMdf6pzBcBUszDaVzl/Untitled?node-id=0-1&t=TZ8C3TSuf7GrI4sH-1
