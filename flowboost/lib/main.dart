@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'constants.dart';
-import 'Screens/features/dashboard/main_scaffold.dart';
+import 'common/constants/constants.dart';
+import 'features/dashboard/main_scaffold.dart';
 
 void main() {
   runApp(const MyApp());
