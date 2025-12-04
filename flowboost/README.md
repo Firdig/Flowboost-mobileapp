@@ -15,8 +15,8 @@ FlowBost adalah aplikasi yang dirancang untuk meningkatkan produktivitas dan kes
  
 5. Link Figma : https://www.figma.com/design/DKMYWMdf6pzBcBUszDaVzl/Untitled?node-id=0-1&t=TZ8C3TSuf7GrI4sH-1
 
-6. WorkSheet : ![WorkSheet](flowboost/worksheets)
+6. WorkSheet : ![worksheets](flowboost/worksheets)
 
-7. Low Fidelity Prototype : ![Low Fidelity Prototype](flowboost/low-fidelity-mockup)
+7. Low Fidelity Prototype : ![low-fidelity-mockup](flowboost/low-fidelity-mockup)
  
 8. Tabel pembagian BackLog : ![Backlogtable](assets/images/Backlogtable.png)
