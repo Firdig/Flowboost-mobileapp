@@ -16,14 +16,53 @@ class PomodoroProvider with ChangeNotifier {
   final Duration _defaultShortBreak = const Duration(minutes: 5);
   final Duration _defaultLongBreak = const Duration(minutes: 15);
 
-  // --- TASK STATE (DATA STATIS) ---
+  // --- TASK STATE - UPDATED DENGAN SUB-TASKS LENGKAP ---
   final List<PomodoroTask> _tasks = [
-    PomodoroTask(title: 'Belajar CSS', targetSessions: 4, completedSessions: 4, isDone: true),
-    PomodoroTask(title: 'Belajar react', targetSessions: 6, completedSessions: 2, note: 'Fokus pada hooks'),
-    // Task baru akan ditambahkan ke list ini secara statis (di memori)
+    PomodoroTask(
+      title: 'Belajar Javascript',
+      targetSessions: 4,
+      completedSessions: 0,
+      subTasks: [
+        SubTask(title: 'Task 1 : Introduction to JavaScript', targetSessions: 3, completedSessions: 0),
+        SubTask(title: 'Task 2 : Variables and Data Types', targetSessions: 3, completedSessions: 0),
+        SubTask(title: 'Task 3 : Functions and Scope', targetSessions: 3, completedSessions: 0),
+        SubTask(title: 'Task 4 : ES6 Features', targetSessions: 3, completedSessions: 0),
+      ],
+    ),
+    PomodoroTask(
+      title: 'Belajar CSS',
+      targetSessions: 4,
+      completedSessions: 4,
+      isDone: true,
+      subTasks: [
+        SubTask(title: 'Task 1 : Introduction to CSS', targetSessions: 3, completedSessions: 3, isDone: true),
+        SubTask(title: 'Task 2 : CSS Selectors', targetSessions: 3, completedSessions: 3, isDone: true),
+        SubTask(title: 'Task 3 : CSS Flexbox', targetSessions: 3, completedSessions: 3, isDone: true),
+        SubTask(title: 'Task 4 : CSS Grid', targetSessions: 3, completedSessions: 3, isDone: true),
+      ],
+    ),
+    PomodoroTask(
+      title: 'Belajar React',
+      targetSessions: 6,
+      completedSessions: 2,
+      note: 'Fokus pada hooks',
+      subTasks: [
+        SubTask(title: 'Task 1 : React Basics', targetSessions: 3, completedSessions: 3, isDone: true),
+        SubTask(title: 'Task 2 : Components and Props', targetSessions: 3, completedSessions: 2),
+        SubTask(title: 'Task 3 : State and Lifecycle', targetSessions: 3, completedSessions: 0),
+        SubTask(title: 'Task 4 : Hooks (useState, useEffect)', targetSessions: 3, completedSessions: 0),
+      ],
+    ),
   ];
   String? _selectedTaskId;
   String? _editingTaskId;
+
+  // Constructor untuk auto-select task pertama
+  PomodoroProvider() {
+    if (_tasks.isNotEmpty) {
+      _selectedTaskId = _tasks.first.id;
+    }
+  }
 
   // --- GETTERS ---
   Duration get currentDuration => _currentDuration;
@@ -42,7 +81,7 @@ class PomodoroProvider with ChangeNotifier {
     }
   }
 
-  // --- TIMER LOGIC (Sama seperti sebelumnya) ---
+  // --- TIMER LOGIC ---
   void toggleTimer() {
     if (_isRunning) {
       pauseTimer();
@@ -54,7 +93,7 @@ class PomodoroProvider with ChangeNotifier {
   void startTimer() {
     if (_timer != null) return;
     if (selectedTask == null && _currentMode == PomodoroMode.pomodoro) {
-      // Opsional: Mencegah start jika tidak ada task di mode pomodoro
+      // Optional: prevent start if no task in pomodoro mode
       // return;
     }
     _isRunning = true;
@@ -131,7 +170,6 @@ class PomodoroProvider with ChangeNotifier {
     notifyListeners();
   }
 
-
   // --- TASK LOGIC ---
   void selectTask(String taskId) {
     _selectedTaskId = taskId;
@@ -139,13 +177,9 @@ class PomodoroProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Logika untuk memulai proses "Add Task"
   void startAddingTask() {
-    // 1. Buat task sementara yang kosong
     final newTask = PomodoroTask(title: '', targetSessions: 1);
-    // 2. Tambahkan ke list statis
     _tasks.add(newTask);
-    // 3. Masuk ke mode edit untuk task baru ini (UI akan berubah ke Gambar 3)
     _editingTaskId = newTask.id;
     notifyListeners();
   }
@@ -158,7 +192,6 @@ class PomodoroProvider with ChangeNotifier {
   void cancelEditingTask() {
     if (_editingTaskId != null) {
       final task = _tasks.firstWhere((t) => t.id == _editingTaskId);
-      // Jika task yang dibatalkan judulnya kosong, berarti itu task baru yang batal dibuat. Hapus.
       if (task.title.isEmpty) {
         _tasks.removeWhere((t) => t.id == _editingTaskId);
       }
@@ -167,14 +200,12 @@ class PomodoroProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Logika menyimpan (baik task baru maupun edit task lama)
   void saveTask(String id, String newTitle, int newTarget, String? newNote) {
     final index = _tasks.indexWhere((task) => task.id == id);
     if (index != -1) {
-      // Update data statis di memori
       _tasks[index].title = newTitle;
       _tasks[index].targetSessions = newTarget;
-      _tasks[index].note = newNote; // Menyimpan note
+      _tasks[index].note = newNote;
 
       if (_tasks[index].completedSessions >= _tasks[index].targetSessions) {
         _tasks[index].isDone = true;
@@ -182,13 +213,11 @@ class PomodoroProvider with ChangeNotifier {
         _tasks[index].isDone = false;
       }
 
-      // PERBAIKAN: Jika task yang baru disimpan belum dipilih, otomatis pilih task tersebut.
-      // Ini agar sesuai dengan alur Gambar 3 ke Gambar 4.
       if (_selectedTaskId != id) {
         selectTask(id);
       }
     }
-    _editingTaskId = null; // Keluar mode edit
+    _editingTaskId = null;
     notifyListeners();
   }
 
