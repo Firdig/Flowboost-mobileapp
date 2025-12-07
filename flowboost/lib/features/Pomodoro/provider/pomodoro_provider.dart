@@ -16,7 +16,7 @@ class PomodoroProvider with ChangeNotifier {
   final Duration _defaultShortBreak = const Duration(minutes: 5);
   final Duration _defaultLongBreak = const Duration(minutes: 15);
 
-  // --- TASK STATE - UPDATED DENGAN SUB-TASKS LENGKAP ---
+  // --- TASK STATE ---
   final List<PomodoroTask> _tasks = [
     PomodoroTask(
       title: 'Belajar Javascript',
@@ -54,10 +54,17 @@ class PomodoroProvider with ChangeNotifier {
       ],
     ),
   ];
+
   String? _selectedTaskId;
   String? _editingTaskId;
 
-  // Constructor untuk auto-select task pertama
+  // Task yang sedang berjalan untuk goals
+  PomodoroTask? _currentGoalTask;
+
+  // Antrian task untuk goals
+  final List<PomodoroTask> _taskQueue = [];
+
+  // Constructor
   PomodoroProvider() {
     if (_tasks.isNotEmpty) {
       _selectedTaskId = _tasks.first.id;
@@ -71,6 +78,8 @@ class PomodoroProvider with ChangeNotifier {
   bool get isEditingTimerUi => _isEditingTimerUi;
   List<PomodoroTask> get tasks => _tasks;
   String? get editingTaskId => _editingTaskId;
+  PomodoroTask? get currentGoalTask => _currentGoalTask;
+  List<PomodoroTask> get taskQueue => _taskQueue;
 
   PomodoroTask? get selectedTask {
     if (_selectedTaskId == null) return null;
@@ -80,6 +89,9 @@ class PomodoroProvider with ChangeNotifier {
       return null;
     }
   }
+
+  // Cek apakah ada task yang sedang berjalan
+  bool get hasRunningTask => _currentGoalTask != null;
 
   // --- TIMER LOGIC ---
   void toggleTimer() {
@@ -92,10 +104,6 @@ class PomodoroProvider with ChangeNotifier {
 
   void startTimer() {
     if (_timer != null) return;
-    if (selectedTask == null && _currentMode == PomodoroMode.pomodoro) {
-      // Optional: prevent start if no task in pomodoro mode
-      // return;
-    }
     _isRunning = true;
     notifyListeners();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -233,6 +241,42 @@ class PomodoroProvider with ChangeNotifier {
     final index = _tasks.indexWhere((task) => task.id == id);
     if (index != -1) {
       _tasks[index].isDone = !_tasks[index].isDone;
+      notifyListeners();
+    }
+  }
+
+  // --- GOAL TASK LOGIC ---
+
+  // Set task goal sebagai current task (untuk Replace atau Start baru)
+  void setGoalTaskAsCurrent(PomodoroTask goalTask) {
+    _currentGoalTask = goalTask;
+    _selectedTaskId = goalTask.id;
+    setMode(PomodoroMode.pomodoro);
+    notifyListeners();
+  }
+
+  // Replace current task dengan goal task baru
+  void replaceCurrentTask(PomodoroTask newGoalTask) {
+    pauseTimer();
+    _currentGoalTask = newGoalTask;
+    _selectedTaskId = newGoalTask.id;
+    setMode(PomodoroMode.pomodoro);
+    notifyListeners();
+  }
+
+  // Add goal task ke antrian
+  void addTaskToQueue(PomodoroTask goalTask) {
+    _taskQueue.add(goalTask);
+    notifyListeners();
+  }
+
+  // Start task dari antrian (untuk next task)
+  void startNextTaskFromQueue() {
+    if (_taskQueue.isNotEmpty) {
+      final nextTask = _taskQueue.removeAt(0);
+      setGoalTaskAsCurrent(nextTask);
+    } else {
+      _currentGoalTask = null;
       notifyListeners();
     }
   }
