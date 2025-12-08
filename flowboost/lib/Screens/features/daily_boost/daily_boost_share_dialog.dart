@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-// Favorite Manager - Simple in-memory storage dengan timestamp
+// Favorite Manager - Simple in-memory storage dengan timestam
 class VideoFavoriteManager {
   static final List<Map<String, dynamic>> _favorites = [];
 

@@ -6,7 +6,7 @@ import 'daily_boost_share_dialog.dart';
 
 enum SortType { defaultOrder, newest, oldest }
 
-// ✅ DailyBoostScreen - Menu Utama
+// ✅ DailyBoostScreen - Home menu
 class DailyBoostScreen extends StatelessWidget {
   const DailyBoostScreen({super.key});
 

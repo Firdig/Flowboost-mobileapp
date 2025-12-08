@@ -113,7 +113,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _controlsAnimationController.forward();
     });
 
-    // Auto hide controls after 3 seconds when playing
+    // Auto hide controls after 3 seconds when playin
     if (isPlaying) {
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted && isPlaying) {

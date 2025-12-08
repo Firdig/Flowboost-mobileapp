@@ -11,7 +11,7 @@ class VideoListScreen extends StatelessWidget {
     required this.categoryName,
     required this.categoryColor,
   });
-
+  
   @override
   Widget build(BuildContext context) {
     // Daftar video dummy berdasarkan kategori

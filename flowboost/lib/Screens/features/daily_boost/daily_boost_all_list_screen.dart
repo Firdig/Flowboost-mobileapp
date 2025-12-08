@@ -50,7 +50,6 @@ class VideoAllListScreen extends StatelessWidget {
       ),
     );
   }
-
   Widget _buildVideoCard(
     BuildContext context, {
     required int index,
