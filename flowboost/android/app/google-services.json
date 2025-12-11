@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "548165128046",
+    "project_id": "flowboost-91bd0",
+    "storage_bucket": "flowboost-91bd0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:548165128046:android:23fd77f6b08cc2004dbb7f",
+        "android_client_info": {
+          "package_name": "com.company.flowboost"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZe35crb2e-39j5WGCWYD8CbXK4Rrftlw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:548165128046:android:42091281d006bfd54dbb7f",
+        "android_client_info": {
+          "package_name": "com.example.flowboost"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZe35crb2e-39j5WGCWYD8CbXK4Rrftlw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
