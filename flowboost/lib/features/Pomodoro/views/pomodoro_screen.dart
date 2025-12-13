@@ -182,27 +182,29 @@ class _PomodoroBody extends StatelessWidget {
           const SizedBox(height: 20),
 
           // --- Add Task Button ---
-          InkWell(
-            onTap: provider.startAddingTask,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade500, style: BorderStyle.solid, width: 1.5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add),
-                    SizedBox(width: 8),
-                    Text('Add Task', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  ],
+          // Hanya tampilkan jika tidak sedang menambah atau mengedit task
+          if (provider.editingTaskId == null)
+            InkWell(
+              onTap: provider.startAddingTask,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade500, style: BorderStyle.solid, width: 1.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add),
+                      SizedBox(width: 8),
+                      Text('Add Task', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
           const SizedBox(height: 40),
         ],
       ),
@@ -744,46 +746,53 @@ class _TaskEditFormState extends State<_TaskEditForm> {
 
   // Handle action dari dialog
   void _handleStartPomodoroAction(String action, int totalCycles) {
+    final provider = Provider.of<PomodoroProvider>(context, listen: false);
+
     if (action == 'replace') {
       // Replace: Ganti task yang sedang berjalan
       setState(() {
         _targetSessions = totalCycles;
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.refresh_rounded, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'Task berhasil diganti',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      if (_selectedGoalTitle != null)
-                        Text(
-                          '$_selectedGoalTitle - $totalCycles siklus',
-                          style: const TextStyle(fontSize: 12),
+      // Simpan perubahan ke provider
+      if (_titleController.text.trim().isNotEmpty) {
+        final noteText = _noteController.text.trim().isEmpty ? null : _noteController.text.trim();
+        provider.saveTask(widget.task.id, _titleController.text.trim(), _targetSessions, noteText);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.refresh_rounded, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Task berhasil diganti',
+                          style: TextStyle(fontWeight: FontWeight.w600),
                         ),
-                    ],
+                        if (_selectedGoalTitle != null)
+                          Text(
+                            '$_selectedGoalTitle - $totalCycles siklus',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+              margin: const EdgeInsets.all(16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-        );
+          );
+        }
       }
     } else if (action == 'add') {
       // Add: Tambahkan ke queue atau mulai task baru
@@ -796,173 +805,17 @@ class _TaskEditFormState extends State<_TaskEditForm> {
           _targetSessions = newTotal;
         });
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.add_circle_rounded, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Task ditambahkan ke queue',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        if (_selectedGoalTitle != null)
-                          Text(
-                            '$_selectedGoalTitle - Total: $newTotal siklus',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.blue,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 3),
-              margin: const EdgeInsets.all(16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-        }
-      } else {
-        // Jika tidak ada task berjalan, mulai task baru
-        setState(() {
-          _targetSessions = totalCycles;
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.play_circle_rounded, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Pomodoro dimulai',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        if (_selectedGoalTitle != null)
-                          Text(
-                            '$_selectedGoalTitle - $totalCycles siklus',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 3),
-              margin: const EdgeInsets.all(16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-        }
-      }
-    }
-
-    // Handle action dari dialog
-    void _handleStartPomodoroAction(String action, int totalCycles) {
-      final provider = Provider.of<PomodoroProvider>(context, listen: false);
-
-      if (action == 'replace') {
-        // Replace: Ganti task yang sedang berjalan
-        setState(() {
-          _targetSessions = totalCycles;
-        });
-
-        // SIMPAN perubahan ke provider
-        final noteText = _noteController.text
-            .trim()
-            .isEmpty ? null : _noteController.text.trim();
-        provider.saveTask(
-            widget.task.id, _titleController.text, _targetSessions, noteText);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(
-                      Icons.refresh_rounded, color: Colors.white, size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Task berhasil diganti',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16),
-                        ),
-                        const SizedBox(height: 4),
-                        if (_selectedGoalTitle != null)
-                          Text(
-                            '$_selectedGoalTitle - $totalCycles siklus',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 3),
-              margin: const EdgeInsets.all(16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          );
-        }
-      } else if (action == 'add') {
-        // Add: Tambahkan ke queue atau mulai task baru
-        final hasRunningTask = _targetSessions > widget.task.completedSessions;
-
-        if (hasRunningTask) {
-          // Jika ada task berjalan, tambahkan ke queue
-          final newTotal = _targetSessions + totalCycles;
-          setState(() {
-            _targetSessions = newTotal;
-          });
-
-          // SIMPAN perubahan ke provider
-          final noteText = _noteController.text
-              .trim()
-              .isEmpty ? null : _noteController.text.trim();
-          provider.saveTask(
-              widget.task.id, _titleController.text, _targetSessions, noteText);
+        // Simpan perubahan ke provider
+        if (_titleController.text.trim().isNotEmpty) {
+          final noteText = _noteController.text.trim().isEmpty ? null : _noteController.text.trim();
+          provider.saveTask(widget.task.id, _titleController.text.trim(), _targetSessions, noteText);
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.white24,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                          Icons.add_circle_rounded, color: Colors.white,
-                          size: 24),
-                    ),
+                    const Icon(Icons.add_circle_rounded, color: Colors.white),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -971,58 +824,44 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                         children: [
                           const Text(
                             'Task ditambahkan ke queue',
-                            style: TextStyle(fontWeight: FontWeight.w600,
-                                fontSize: 16),
+                            style: TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          const SizedBox(height: 4),
                           if (_selectedGoalTitle != null)
                             Text(
                               '$_selectedGoalTitle - Total: $newTotal siklus',
-                              style: const TextStyle(fontSize: 13),
+                              style: const TextStyle(fontSize: 12),
                             ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                backgroundColor: const Color(0xFF2196F3),
-                // Biru yang lebih terang
+                backgroundColor: Colors.blue,
                 behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 3),
                 margin: const EdgeInsets.all(16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             );
           }
-        } else {
-          // Jika tidak ada task berjalan, mulai task baru
-          setState(() {
-            _targetSessions = totalCycles;
-          });
+        }
+      } else {
+        // Jika tidak ada task berjalan, mulai task baru
+        setState(() {
+          _targetSessions = totalCycles;
+        });
 
-          // SIMPAN perubahan ke provider
-          final noteText = _noteController.text
-              .trim()
-              .isEmpty ? null : _noteController.text.trim();
-          provider.saveTask(
-              widget.task.id, _titleController.text, _targetSessions, noteText);
+        // Simpan perubahan ke provider
+        if (_titleController.text.trim().isNotEmpty) {
+          final noteText = _noteController.text.trim().isEmpty ? null : _noteController.text.trim();
+          provider.saveTask(widget.task.id, _titleController.text.trim(), _targetSessions, noteText);
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.white24,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                          Icons.play_circle_rounded, color: Colors.white,
-                          size: 24),
-                    ),
+                    const Icon(Icons.play_circle_rounded, color: Colors.white),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -1031,43 +870,51 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                         children: [
                           const Text(
                             'Pomodoro dimulai',
-                            style: TextStyle(fontWeight: FontWeight.w600,
-                                fontSize: 16),
+                            style: TextStyle(fontWeight: FontWeight.w600),
                           ),
-                          const SizedBox(height: 4),
                           if (_selectedGoalTitle != null)
                             Text(
                               '$_selectedGoalTitle - $totalCycles siklus',
-                              style: const TextStyle(fontSize: 13),
+                              style: const TextStyle(fontSize: 12),
                             ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                backgroundColor: const Color(0xFF4CAF50),
-                // Hijau
+                backgroundColor: Colors.green,
                 behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 3),
                 margin: const EdgeInsets.all(16),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             );
           }
         }
       }
-
-      // Setelah handle action, kembali ke halaman utama
-      // Data sudah tersimpan, aman untuk keluar
-      provider.cancelEditingTask();
     }
   }
-
-  // Fungsi untuk menampilkan popup Choose Goal (Level 1)
+// Fungsi untuk menampilkan popup Choose Goal (Level 1)
+// Hanya menampilkan task GOALS (task dengan subTasks)
   Future<void> _showChooseGoalDialog() async {
     final provider = Provider.of<PomodoroProvider>(context, listen: false);
     String? selectedGoalId;
+
+    // Filter: hanya tampilkan task yang memiliki subTasks (Goals)
+    final goalTasks = provider.tasks.where((t) {
+      return t.subTasks != null && t.subTasks!.isNotEmpty;
+    }).toList();
+
+    // Jika tidak ada goal yang tersedia
+    if (goalTasks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tidak ada goal yang tersedia.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
 
     await showDialog(
       context: context,
@@ -1096,10 +943,8 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                 ),
                 const SizedBox(height: 20),
 
-                // List task dengan checkbox
-                ...provider.tasks
-                    .where((t) => t.id != widget.task.id)
-                    .map((task) => Container(
+                // List HANYA task goals (yang punya subTasks)
+                ...goalTasks.map((task) => Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -1117,6 +962,10 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                       task.title,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
+                    subtitle: Text(
+                      '${task.subTasks?.length ?? 0} subtasks',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
                     trailing: Icon(
                       Icons.check,
                       color: selectedGoalId == task.id ? Colors.black : Colors.transparent,
@@ -1127,8 +976,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                       });
                     },
                   ),
-                ))
-                    .toList(),
+                )).toList(),
 
                 const SizedBox(height: 20),
 
@@ -1138,7 +986,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                   child: ElevatedButton(
                     onPressed: selectedGoalId == null ? null : () {
                       Navigator.pop(context);
-                      final selectedTask = provider.tasks.firstWhere((t) => t.id == selectedGoalId);
+                      final selectedTask = goalTasks.firstWhere((t) => t.id == selectedGoalId);
                       _showChooseTaskDialog(selectedTask);
                     },
                     style: ElevatedButton.styleFrom(
@@ -1163,8 +1011,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
       ),
     );
   }
-
-  // Popup Level 2: Choose Task (dari sub-tasks)
+// Popup Level 2: Choose Task (dari sub-tasks)
   Future<void> _showChooseTaskDialog(PomodoroTask selectedGoal) async {
     if (selectedGoal.subTasks == null || selectedGoal.subTasks!.isEmpty) {
       // Jika tidak ada subtask, langsung tampilkan dialog konfirmasi
@@ -1178,12 +1025,11 @@ class _TaskEditFormState extends State<_TaskEditForm> {
 
       // Handle hasil pilihan
       if (result == null || result == 'cancel') {
-        // Cancel: tidak melakukan apa-apa, tetap di halaman edit
         return;
       }
 
-      // Handle Replace atau Add
-      _handleStartPomodoroAction(result, selectedGoal.targetSessions);
+      // Handle Replace atau Add - Update task yang dipilih
+      _handleStartPomodoroActionForSelectedGoal(result, selectedGoal, selectedGoal.targetSessions);
       return;
     }
 
@@ -1299,7 +1145,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
     );
   }
 
-  // Popup Level 3: Sub-Task Detail dengan pengaturan siklus
+// Popup Level 3: Sub-Task Detail dengan pengaturan siklus
   Future<void> _showSubTaskDetailDialog(PomodoroTask mainTask, SubTask subTask) async {
     List<int> subTaskCycles = List.generate(3, (index) => 0);
 
@@ -1509,7 +1355,6 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                         child: ElevatedButton(
                           onPressed: () {
                             Navigator.pop(context);
-                            _showChooseTaskDialog(mainTask); // Kembali ke Level 2
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF3D3D3D),
@@ -1545,20 +1390,13 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                               return;
                             }
 
-                            // Simpan data goals yang dipilih
-                            setState(() {
-                              _selectedGoalTitle = mainTask.title;
-                              _selectedSubTaskTitle = subTask.title;
-                              _pendingCycles = totalCycles;
-                            });
-
                             // Cek apakah ada task yang sedang berjalan
                             final hasRunningTask = _targetSessions > widget.task.completedSessions;
 
                             // Tutup dialog detail terlebih dahulu
                             Navigator.pop(context);
 
-                            // Tampilkan dialog konfirmasi (SELALU muncul)
+                            // Tampilkan dialog konfirmasi
                             final result = await _showStartPomodoroDialog(
                                 totalCycles,
                                 mainTask.title,
@@ -1568,12 +1406,11 @@ class _TaskEditFormState extends State<_TaskEditForm> {
 
                             // Handle hasil pilihan
                             if (result == null || result == 'cancel') {
-                              // Cancel: tidak melakukan apa-apa, tetap di halaman edit
                               return;
                             }
 
-                            // Handle Replace atau Add
-                            _handleStartPomodoroAction(result, totalCycles);
+                            // Handle Replace atau Add - Update goal yang dipilih, bukan task saat ini
+                            _handleStartPomodoroActionForSelectedGoal(result, mainTask, totalCycles);
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF3D3D3D),
@@ -1587,9 +1424,8 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                           child: const Text(
                             'Start Pomodoro',
                             style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
@@ -1602,6 +1438,63 @@ class _TaskEditFormState extends State<_TaskEditForm> {
         ),
       ),
     );
+  }
+
+// Fungsi baru untuk handle action pada goal yang dipilih (bukan task saat ini)
+  void _handleStartPomodoroActionForSelectedGoal(String action, PomodoroTask selectedGoal, int newSessions) {
+    final provider = Provider.of<PomodoroProvider>(context, listen: false);
+
+    if (action == 'replace') {
+      // Replace: Ganti target sessions (completed tetap)
+      final taskIndex = provider.tasks.indexWhere((t) => t.id == selectedGoal.id);
+      if (taskIndex != -1) {
+        // Hanya ganti target, completed sessions TETAP
+        final currentCompleted = provider.tasks[taskIndex].completedSessions;
+        provider.tasks[taskIndex].targetSessions = newSessions;
+
+        // Update status isDone berdasarkan completed vs target baru
+        if (currentCompleted >= newSessions) {
+          provider.tasks[taskIndex].isDone = true;
+        } else {
+          provider.tasks[taskIndex].isDone = false;
+        }
+
+        provider.notifyListeners();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${selectedGoal.title} diganti: $currentCompleted/$newSessions'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else if (action == 'add') {
+      // Add: Tambahkan sesi ke target (completed tetap)
+      final taskIndex = provider.tasks.indexWhere((t) => t.id == selectedGoal.id);
+      if (taskIndex != -1) {
+        final currentCompleted = provider.tasks[taskIndex].completedSessions;
+        final currentTarget = provider.tasks[taskIndex].targetSessions;
+        final newTarget = currentTarget + newSessions;
+
+        provider.tasks[taskIndex].targetSessions = newTarget;
+
+        // Update status isDone berdasarkan completed vs target baru
+        if (currentCompleted >= newTarget) {
+          provider.tasks[taskIndex].isDone = true;
+        } else {
+          provider.tasks[taskIndex].isDone = false;
+        }
+
+        provider.notifyListeners();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${selectedGoal.title} ditambah $newSessions siklus: $currentCompleted/$newTarget'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -1715,6 +1608,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
           ),
           const SizedBox(height: 15),
 
+          // Tombol Add Note - selalu dimulai dari tombol, tidak langsung terbuka
           if (!_showNoteField)
             TextButton.icon(
               onPressed: () {
@@ -1751,15 +1645,17 @@ class _TaskEditFormState extends State<_TaskEditForm> {
 
           const SizedBox(height: 10),
 
-          TextButton.icon(
-            onPressed: _showChooseGoalDialog,
-            icon: const Icon(Icons.add, color: Colors.black54, size: 20),
-            label: const Text(
-              'Use Goals',
-              style: TextStyle(color: Colors.black54, fontSize: 14),
+          // Use Goals hanya muncul saat ADD task baru
+          // Cek apakah task sudah pernah disimpan (completedSessions > 0 atau ada di list)
+          if (widget.task.completedSessions == 0 && widget.task.title.isEmpty)
+            TextButton.icon(
+              onPressed: _showChooseGoalDialog,
+              icon: const Icon(Icons.add, color: Colors.black54, size: 20),
+              label: const Text(
+                'Use Goals',
+                style: TextStyle(color: Colors.black54, fontSize: 14),
+              ),
             ),
-          ),
-
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -1780,6 +1676,9 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                   if (_titleController.text.trim().isNotEmpty) {
                     final noteText = _noteController.text.trim().isEmpty ? null : _noteController.text.trim();
                     provider.saveTask(widget.task.id, _titleController.text, _targetSessions, noteText);
+
+                    // Langsung buat form task baru lagi
+                    provider.startAddingTask();
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Nama tugas tidak boleh kosong'))
