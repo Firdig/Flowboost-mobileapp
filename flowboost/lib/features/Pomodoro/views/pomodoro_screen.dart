@@ -1120,7 +1120,10 @@ class _TaskEditFormState extends State<_TaskEditForm> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showChooseGoalDialog(); // Kembali ke Level 1
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPomodoroDarkButtonColor,
                     foregroundColor: Colors.white,
