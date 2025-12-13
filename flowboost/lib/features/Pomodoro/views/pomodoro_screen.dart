@@ -1494,9 +1494,6 @@ class _TaskEditFormState extends State<_TaskEditForm> {
     }
   }
 
-// CATATAN: Fungsi _handleStartPomodoroAction sudah ada di line 748
-// Jadi TIDAK perlu didefinisikan lagi di sini
-// Fungsi yang sudah ada akan tetap digunakan untuk task saat ini
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<PomodoroProvider>(context, listen: false);
