@@ -3,8 +3,8 @@ import 'common/constants/constants.dart';
 import 'features/dashboard/main_scaffold.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-
-
+import 'features/authentication/register/views/register.dart';
+import 'features/authentication/login/views/login.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade400)),
         ),
       ),
-      home: const MainScaffold(),
+      home: const FlowboostLoginScreen(),
     );
   }
 }
