@@ -980,8 +980,8 @@ class _TaskEditFormState extends State<_TaskEditForm> {
     final provider = Provider.of<PomodoroProvider>(context, listen: false);
     String? selectedGoalId;
 
-    // Filter: hanya tampilkan task yang memiliki subTasks (Goals)
-    final goalTasks = provider.tasks.where((t) {
+    // ✅ PERBAIKAN: Gunakan allTasks untuk akses semua task termasuk yang hidden
+    final goalTasks = provider.allTasks.where((t) {
       return t.subTasks != null && t.subTasks!.isNotEmpty;
     }).toList();
 
@@ -1109,7 +1109,6 @@ class _TaskEditFormState extends State<_TaskEditForm> {
       }
 
       // Handle Replace atau Add - Update task yang dipilih
-// ✅ Pass title dan note dari goal yang dipilih
       _handleStartPomodoroAction(
           result,
           selectedGoal.targetSessions,
@@ -1232,7 +1231,12 @@ class _TaskEditFormState extends State<_TaskEditForm> {
   }
 // Popup Level 3: Sub-Task Detail dengan pengaturan siklus
   Future<void> _showSubTaskDetailDialog(PomodoroTask mainTask, SubTask subTask) async {
-    List<int> subTaskCycles = List.generate(3, (index) => 0);
+    // State untuk menyimpan cycles tiap sub-task (maksimal 3 sub-task)
+    Map<int, int> subTaskCycles = {
+      0: 0, // Pengenalan & Konsep Dasar
+      1: 0, // Implementasi & Praktik
+      2: 0, // Review & Penguatan
+    };
 
     await showDialog(
       context: context,
@@ -1254,6 +1258,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Header
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -1269,6 +1274,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                         ),
                         const SizedBox(height: 16),
 
+                        // Selected Goal & SubTask
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           decoration: BoxDecoration(
@@ -1305,6 +1311,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                         ),
                         const SizedBox(height: 16),
 
+                        // 3 Sub-Task Cards
                         ...List.generate(3, (index) {
                           final subTaskNumber = index + 1;
                           final subTaskNames = [
@@ -1378,7 +1385,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                                         ),
                                         onPressed: () {
                                           setDialogState(() {
-                                            subTaskCycles[index]++;
+                                            subTaskCycles[index] = subTaskCycles[index]! + 1;
                                           });
                                         },
                                         padding: EdgeInsets.zero,
@@ -1402,9 +1409,9 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                                           size: 24,
                                         ),
                                         onPressed: () {
-                                          if (subTaskCycles[index] > 0) {
+                                          if (subTaskCycles[index]! > 0) {
                                             setDialogState(() {
-                                              subTaskCycles[index]--;
+                                              subTaskCycles[index] = subTaskCycles[index]! - 1;
                                             });
                                           }
                                         },
@@ -1423,6 +1430,7 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                   ),
                 ),
 
+                // Bottom Buttons
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: const BoxDecoration(
@@ -1436,7 +1444,10 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () {
+                            Navigator.pop(context);              // Tutup Level 3
+                            _showChooseTaskDialog(mainTask);     // Buka Level 2
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF3D3D3D),
                             foregroundColor: Colors.white,
@@ -1456,7 +1467,8 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () async {
-                            final totalCycles = subTaskCycles.reduce((a, b) => a + b);
+                            // ✅ Hitung total cycles
+                            final totalCycles = subTaskCycles.values.reduce((a, b) => a + b);
 
                             if (totalCycles <= 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -1468,9 +1480,12 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                               return;
                             }
 
+                            // ✅ Cek apakah ada task yang sedang berjalan
                             final hasRunningTask = _targetSessions > widget.task.completedSessions;
+
                             Navigator.pop(context);
 
+                            // ✅ Tampilkan dialog konfirmasi
                             final result = await _showStartPomodoroDialog(
                                 totalCycles,
                                 mainTask.title,
@@ -1482,12 +1497,12 @@ class _TaskEditFormState extends State<_TaskEditForm> {
                               return;
                             }
 
-                            // ✅ Pass title subtask dan note sebagai parameter
-                            _handleStartPomodoroAction(
-                                result,
-                                totalCycles,
-                                subTask.title,
-                                '${mainTask.title} - ${subTask.title}'
+                            // ✅ Handle berdasarkan hasil pilihan user
+                            _handleMultipleSubTasksWithGoalData(
+                              mainTask,
+                              subTask,
+                              subTaskCycles,
+                              result,
                             );
                           },
                           style: ElevatedButton.styleFrom(
@@ -1514,6 +1529,112 @@ class _TaskEditFormState extends State<_TaskEditForm> {
         ),
       ),
     );
+  }
+
+// ============================================================================
+// 2️⃣ METHOD: Handle Multiple Sub-Tasks dengan Goal Data (NEW)
+// ============================================================================
+  void _handleMultipleSubTasksWithGoalData(
+      PomodoroTask mainTask,
+      SubTask selectedSubTask,
+      Map<int, int> selectedSubTaskCycles,
+      String action
+      ) {
+    final provider = Provider.of<PomodoroProvider>(context, listen: false);
+
+    // Nama sub-task yang FIXED (sesuai gambar)
+    final fixedSubTaskNames = [
+      'Pengenalan & Konsep Dasar',
+      'Implementasi & Praktik',
+      'Review & Penguatan',
+    ];
+
+    // ✅ Konversi map ke list task info (HANYA yang memiliki cycles > 0)
+    List<Map<String, dynamic>> selectedTasks = [];
+    selectedSubTaskCycles.forEach((index, cycles) {
+      if (cycles > 0 && index < fixedSubTaskNames.length) {
+        // ✅ PERBAIKAN FORMAT:
+        // Title: "Pengenalan & Konsep Dasar" (hanya nama sub-task)
+        // Note: "From: Task 1 : Introduction to JavaScript" (lengkap dengan Task number)
+
+        selectedTasks.add({
+          'title': fixedSubTaskNames[index],  // ✅ Hanya nama sub-task
+          'cycles': cycles,
+          'note': 'From: ${selectedSubTask.title}',  // ✅ Format: "From: Task 1 : Introduction to JavaScript"
+        });
+      }
+    });
+
+    // ✅ Validasi: pastikan ada yang dipilih
+    if (selectedTasks.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pilih minimal 1 sub-task'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    // ✅ LOGIC UTAMA: Hapus parent → Tambah sub-tasks
+    if (action == 'replace' || action == 'add') {
+      // Step 1: HAPUS task parent
+      provider.deleteTask(widget.task.id);
+
+      // Step 2: Tambahkan semua sub-tasks sebagai task terpisah
+      for (var task in selectedTasks) {
+        provider.addNewTask(
+          task['title'] as String,
+          task['cycles'] as int,
+          task['note'] as String?,
+        );
+      }
+
+      // Step 3: Tampilkan notifikasi
+      if (mounted) {
+        final isReplace = action == 'replace';
+        final taskCount = selectedTasks.length;
+        final totalCycles = selectedTasks.fold<int>(0, (sum, task) => sum + (task['cycles'] as int));
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  isReplace ? Icons.refresh_rounded : Icons.add_circle_rounded,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        isReplace ? 'Task berhasil diganti' : 'Sub-task ditambahkan',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        '$taskCount task baru • $totalCycles total siklus',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: isReplace ? Colors.green : Colors.blue,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -1657,12 +1778,12 @@ class _TaskEditFormState extends State<_TaskEditForm> {
 
           const SizedBox(height: 10),
 
-          if (widget.task.completedSessions == 0 && widget.task.title.isEmpty)
-            TextButton.icon(
-              onPressed: _showChooseGoalDialog,
-              icon: const Icon(Icons.add, color: Colors.black54, size: 20),
-              label: const Text('Use Goals', style: TextStyle(color: Colors.black54, fontSize: 14)),
-            ),
+          // ✅ SEKARANG (selalu tampil saat editing)
+          TextButton.icon(
+            onPressed: _showChooseGoalDialog,
+            icon: const Icon(Icons.add, color: Colors.black54, size: 20),
+            label: const Text('Use Goals', style: TextStyle(color: Colors.black54, fontSize: 14)),
+          ),
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
