@@ -1,347 +1,354 @@
 import 'package:flutter/material.dart';
+import '/services/auth_service.dart';
+import '../../../dashboard/main_scaffold.dart';
 
-void main() {
-  runApp(const MyApp());
-}
+class FlowboostLoginScreen extends StatefulWidget {
+  const FlowboostLoginScreen({super.key});
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flowboost',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
-      ),
-      home: const LoginScreen(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  static const String logoPath = 'assets/images/flowboost_logo.png';
+  static const String googleIconPath = 'assets/images/google.png';
+  static const String facebookIconPath = 'assets/images/facebook.png';
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<FlowboostLoginScreen> createState() => _FlowboostLoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _usernameController = TextEditingController();
+class _FlowboostLoginScreenState extends State<FlowboostLoginScreen> {
+  final _auth = AuthService();
+
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  bool _loading = false;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  Future<void> _run(Future<void> Function() action) async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      await action();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login gagal: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+ Future<void> _loginEmailPassword() async {
+  final email = _emailController.text.trim();
+  final pass = _passwordController.text;
+
+  final auth = AuthService();
+    if (email.isEmpty || pass.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email dan password wajib diisi')),
+      );
+      return;
+    }
+
+     await auth.signInWithEmail(email: email, password: pass);
+
+  if (!mounted) return;
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const MainScaffold()),
+    (route) => false,
+  );
+
+    // TODO: arahkan ke halaman home kamu
+    // Navigator.pushReplacementNamed(context, '/home');
+  }
+
+  Future<void> _loginGoogle() async {
+  await AuthService().signInWithGoogle();
+
+  if (!mounted) return;
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const MainScaffold()),
+    (route) => false,
+  );
+}
+
+
+  Future<void> _loginFacebook() async {
+  await AuthService().signInWithFacebook();
+
+  if (!mounted) return;
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const MainScaffold()),
+    (route) => false,
+  );
+}
+
+
   @override
   Widget build(BuildContext context) {
+    const bg = Color.fromARGB(255, 245, 240, 227);
+    const primaryTextColor = Colors.black;
+    const hintTextColor = Colors.grey;
+    const inputFillColor = Colors.black;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5EFE0),
+      backgroundColor: bg,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo
-                CustomPaint(
-                  size: const Size(120, 120),
-                  painter: FlowboostLogoPainter(),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 16),
+
+              Center(
+                child: Image.asset(
+                  FlowboostLoginScreen.logoPath,
+                  height: 220,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.favorite, size: 120, color: Colors.black),
                 ),
-                const SizedBox(height: 16),
-                
-                // App Name
-                const Text(
-                  'Flowboost',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+              ),
+
+              const SizedBox(height: 10),
+
+              Center(
+                child: RichText(
+                  text: const TextSpan(
+                    style: TextStyle(
+                      fontSize: 42,
+                      fontWeight: FontWeight.w800,
+                      color: primaryTextColor,
+                    ),
+                    children: [
+                      TextSpan(text: 'Flowboost'),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.top,
+                        child: Padding(
+                          padding: EdgeInsets.only(left: 4),
+                          child: Text(
+                            '™',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: primaryTextColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  '™',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                
-                // Nickname Field
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Nickname',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _usernameController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Username',
-                        hintStyle: TextStyle(color: Colors.grey[600]),
-                        filled: true,
-                        fillColor: Colors.black87,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                
-                // Password Field
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Password',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Password',
-                        hintStyle: TextStyle(color: Colors.grey[600]),
-                        filled: true,
-                        fillColor: Colors.black87,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                
-                // Login Button
-                Align(
-                  alignment: Alignment.centerRight,
+              ),
+
+              const SizedBox(height: 36),
+
+              _LabeledField(
+                label: 'Email', // sebelumnya "Nickname"
+                hintText: 'email@contoh.com',
+                hintTextColor: hintTextColor,
+                fillColor: inputFillColor,
+                controller: _emailController,
+              ),
+
+              const SizedBox(height: 18),
+
+              _LabeledField(
+                label: 'Password',
+                hintText: 'Password',
+                hintTextColor: hintTextColor,
+                fillColor: inputFillColor,
+                obscureText: true,
+                controller: _passwordController,
+              ),
+
+              const SizedBox(height: 22),
+
+              Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 180,
+                  height: 52,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // Handle login
-                    },
+                    onPressed: _loading ? null : () => _run(_loginEmailPassword),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00C853),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 40,
-                        vertical: 14,
-                      ),
+                      backgroundColor: Colors.green,
+                      elevation: 6,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      elevation: 0,
                     ),
+                    child: _loading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 3),
+                          )
+                        : const Text(
+                            'Login',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              const Text(
+                'Or Login with :',
+                style: TextStyle(fontSize: 20, color: primaryTextColor),
+              ),
+
+              const SizedBox(height: 18),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _SocialIconButton(
+                    assetPath: FlowboostLoginScreen.googleIconPath,
+                    fallback: 'G',
+                    onTap: _loading ? null : () => _run(_loginGoogle),
+                  ),
+                  const SizedBox(width: 36),
+                  _SocialIconButton(
+                    assetPath: FlowboostLoginScreen.facebookIconPath,
+                    fallback: 'f',
+                    onTap: _loading ? null : () => _run(_loginFacebook),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 80),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Dont have an account? ',
+                    style: TextStyle(fontSize: 20, color: primaryTextColor),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      debugPrint('Create Account tapped');
+                      // TODO: navigate to register
+                    },
                     child: const Text(
-                      'Login',
+                      'Create Account',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                        color: Color.fromARGB(255, 0, 160, 210),
+                        decoration: TextDecoration.none,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Or Login with
-                const Text(
-                  'Or Login with :',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                // Social Login Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildSocialButton(
-                      icon: Icons.g_mobiledata,
-                      color: Colors.red,
-                      onTap: () {},
-                    ),
-                    const SizedBox(width: 20),
-                    _buildSocialButton(
-                      icon: Icons.facebook,
-                      color: const Color(0xFF1877F2),
-                      onTap: () {},
-                    ),
-                    const SizedBox(width: 20),
-                    _buildSocialButton(
-                      icon: Icons.close,
-                      color: Colors.black,
-                      onTap: () {},
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                
-                // Create Account
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Dont have an account?  ',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        // Handle create account
-                      },
-                      child: const Text(
-                        'Create Account',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF00BCD4),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildSocialButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(50),
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.grey[300]!, width: 1),
+class _LabeledField extends StatelessWidget {
+  const _LabeledField({
+    required this.label,
+    required this.hintText,
+    required this.hintTextColor,
+    required this.fillColor,
+    required this.controller,
+    this.obscureText = false,
+  });
+
+  final String label;
+  final String hintText;
+  final Color hintTextColor;
+  final Color fillColor;
+  final bool obscureText;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 22, color: Colors.black)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          obscureText: obscureText,
+          style: const TextStyle(color: Colors.white, fontSize: 20),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(color: hintTextColor.withOpacity(0.7), fontSize: 22),
+            filled: true,
+            fillColor: fillColor,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
         ),
-        child: Icon(
-          icon,
-          color: color,
-          size: 32,
-        ),
-      ),
+      ],
     );
   }
 }
 
-class FlowboostLogoPainter extends CustomPainter {
+class _SocialIconButton extends StatelessWidget {
+  const _SocialIconButton({
+    required this.assetPath,
+    required this.fallback,
+    required this.onTap,
+  });
+
+  final String assetPath;
+  final String fallback;
+  final VoidCallback? onTap;
+
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black87
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round;
-
-    // Moon/Crescent (top)
-    final moonPath = Path();
-    moonPath.addArc(
-      Rect.fromCircle(center: Offset(size.width * 0.6, size.height * 0.2), radius: 15),
-      3.14 * 0.3,
-      3.14 * 1.4,
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: SizedBox(
+        width: 70,
+        height: 70,
+        child: Center(
+          child: Image.asset(
+            assetPath,
+            width: 56,
+            height: 56,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) {
+              return CircleAvatar(
+                radius: 28,
+                backgroundColor: Colors.transparent,
+                child: Text(
+                  fallback,
+                  style: const TextStyle(
+                    fontSize: 38,
+                    color: Colors.black,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
     );
-    canvas.drawPath(moonPath, paint);
-
-    // Wave 1
-    final wave1 = Path();
-    wave1.moveTo(size.width * 0.2, size.height * 0.4);
-    wave1.quadraticBezierTo(
-      size.width * 0.35, size.height * 0.35,
-      size.width * 0.5, size.height * 0.4,
-    );
-    wave1.quadraticBezierTo(
-      size.width * 0.65, size.height * 0.45,
-      size.width * 0.8, size.height * 0.4,
-    );
-    canvas.drawPath(wave1, paint);
-
-    // Wave 2
-    final wave2 = Path();
-    wave2.moveTo(size.width * 0.2, size.height * 0.5);
-    wave2.quadraticBezierTo(
-      size.width * 0.35, size.height * 0.45,
-      size.width * 0.5, size.height * 0.5,
-    );
-    wave2.quadraticBezierTo(
-      size.width * 0.65, size.height * 0.55,
-      size.width * 0.8, size.height * 0.5,
-    );
-    canvas.drawPath(wave2, paint);
-
-    // Heart
-    final heartPath = Path();
-    // Left curve
-    heartPath.moveTo(size.width * 0.5, size.height * 0.65);
-    heartPath.cubicTo(
-      size.width * 0.5, size.height * 0.6,
-      size.width * 0.3, size.height * 0.55,
-      size.width * 0.3, size.height * 0.7,
-    );
-    heartPath.cubicTo(
-      size.width * 0.3, size.height * 0.8,
-      size.width * 0.5, size.height * 0.9,
-      size.width * 0.5, size.height * 0.9,
-    );
-    // Right curve
-    heartPath.cubicTo(
-      size.width * 0.5, size.height * 0.9,
-      size.width * 0.7, size.height * 0.8,
-      size.width * 0.7, size.height * 0.7,
-    );
-    heartPath.cubicTo(
-      size.width * 0.7, size.height * 0.55,
-      size.width * 0.5, size.height * 0.6,
-      size.width * 0.5, size.height * 0.65,
-    );
-    canvas.drawPath(heartPath, paint);
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
