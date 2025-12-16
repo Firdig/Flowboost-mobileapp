@@ -8,7 +8,7 @@ class RetroContainer extends StatelessWidget {
   final Color? backgroundColor;
   final double borderRadius;
   // Tambah opsi untuk mematikan shadow (berguna saat task tidak dipilih)
-  final bool hasShadow;
+  final bool hasShadow; 
 
   const RetroContainer({
     super.key,

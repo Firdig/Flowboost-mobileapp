@@ -1,3 +1,6 @@
+// FILE: lib/features/Pomodoro/provider/pomodoro_provider.dart
+// ✅ VERSI FINAL - TANPA DUPLIKAT
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/pomodoro_task_model.dart';
@@ -16,7 +19,7 @@ class PomodoroProvider with ChangeNotifier {
   final Duration _defaultShortBreak = const Duration(minutes: 5);
   final Duration _defaultLongBreak = const Duration(minutes: 15);
 
-  // --- TASK STATE - UPDATED DENGAN SUB-TASKS LENGKAP ---
+  // --- TASK STATE ---
   final List<PomodoroTask> _tasks = [
     PomodoroTask(
       title: 'Belajar Javascript',
@@ -54,10 +57,20 @@ class PomodoroProvider with ChangeNotifier {
       ],
     ),
   ];
+
   String? _selectedTaskId;
   String? _editingTaskId;
 
-  // Constructor untuk auto-select task pertama
+  // ✅ Track task induk yang harus disembunyikan
+  final Set<String> _hiddenParentTaskIds = {};
+
+  // Task yang sedang berjalan untuk goals
+  PomodoroTask? _currentGoalTask;
+
+  // Antrian task untuk goals
+  final List<PomodoroTask> _taskQueue = [];
+
+  // Constructor
   PomodoroProvider() {
     if (_tasks.isNotEmpty) {
       _selectedTaskId = _tasks.first.id;
@@ -69,8 +82,18 @@ class PomodoroProvider with ChangeNotifier {
   PomodoroMode get currentMode => _currentMode;
   bool get isRunning => _isRunning;
   bool get isEditingTimerUi => _isEditingTimerUi;
-  List<PomodoroTask> get tasks => _tasks;
+
+  // ✅ Getter tasks yang otomatis filter task induk yang disembunyikan
+  List<PomodoroTask> get tasks {
+    return _tasks.where((task) => !_hiddenParentTaskIds.contains(task.id)).toList();
+  }
+
+  // ✅ Getter untuk semua tasks (tanpa filter)
+  List<PomodoroTask> get allTasks => _tasks;
+
   String? get editingTaskId => _editingTaskId;
+  PomodoroTask? get currentGoalTask => _currentGoalTask;
+  List<PomodoroTask> get taskQueue => _taskQueue;
 
   PomodoroTask? get selectedTask {
     if (_selectedTaskId == null) return null;
@@ -80,6 +103,8 @@ class PomodoroProvider with ChangeNotifier {
       return null;
     }
   }
+
+  bool get hasRunningTask => _currentGoalTask != null;
 
   // --- TIMER LOGIC ---
   void toggleTimer() {
@@ -92,10 +117,6 @@ class PomodoroProvider with ChangeNotifier {
 
   void startTimer() {
     if (_timer != null) return;
-    if (selectedTask == null && _currentMode == PomodoroMode.pomodoro) {
-      // Optional: prevent start if no task in pomodoro mode
-      // return;
-    }
     _isRunning = true;
     notifyListeners();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -214,18 +235,61 @@ class PomodoroProvider with ChangeNotifier {
       }
 
       if (_selectedTaskId != id) {
-        selectTask(id);
+        _selectedTaskId = id;
       }
     }
+
     _editingTaskId = null;
+    notifyListeners();
+  }
+
+  // ✅ Tambah task baru dan sembunyikan semua task induk
+  String addNewTask(String title, int targetSessions, String? note) {
+    print('🆕 addNewTask called - Title: $title');
+
+    // Sembunyikan semua task induk (yang punya subtasks)
+    for (var task in _tasks) {
+      if (task.subTasks != null && task.subTasks!.isNotEmpty) {
+        _hiddenParentTaskIds.add(task.id);
+        print('🙈 Hiding parent task: ${task.title} (ID: ${task.id})');
+      }
+    }
+
+    final newTask = PomodoroTask(
+      title: title,
+      targetSessions: targetSessions,
+      completedSessions: 0,
+      note: note,
+    );
+
+    _tasks.add(newTask);
+    _selectedTaskId = newTask.id;
+    _editingTaskId = null;
+
+    print('✅ New task added: $title');
+    print('📋 Visible tasks: ${tasks.length}');
+    print('🔒 Hidden parent tasks: ${_hiddenParentTaskIds.length}');
+
+    notifyListeners();
+    return newTask.id;
+  }
+
+  // ✅ Tampilkan kembali semua task induk
+  void showAllParentTasks() {
+    _hiddenParentTaskIds.clear();
+    print('👁️ All parent tasks are now visible');
     notifyListeners();
   }
 
   void deleteTask(String id) {
     _tasks.removeWhere((task) => task.id == id);
+
     if (_selectedTaskId == id) {
       _selectedTaskId = null;
     }
+
+    _hiddenParentTaskIds.remove(id);
+
     notifyListeners();
   }
 
@@ -233,6 +297,37 @@ class PomodoroProvider with ChangeNotifier {
     final index = _tasks.indexWhere((task) => task.id == id);
     if (index != -1) {
       _tasks[index].isDone = !_tasks[index].isDone;
+      notifyListeners();
+    }
+  }
+
+  // --- GOAL TASK LOGIC ---
+  void setGoalTaskAsCurrent(PomodoroTask goalTask) {
+    _currentGoalTask = goalTask;
+    _selectedTaskId = goalTask.id;
+    setMode(PomodoroMode.pomodoro);
+    notifyListeners();
+  }
+
+  void replaceCurrentTask(PomodoroTask newGoalTask) {
+    pauseTimer();
+    _currentGoalTask = newGoalTask;
+    _selectedTaskId = newGoalTask.id;
+    setMode(PomodoroMode.pomodoro);
+    notifyListeners();
+  }
+
+  void addTaskToQueue(PomodoroTask goalTask) {
+    _taskQueue.add(goalTask);
+    notifyListeners();
+  }
+
+  void startNextTaskFromQueue() {
+    if (_taskQueue.isNotEmpty) {
+      final nextTask = _taskQueue.removeAt(0);
+      setGoalTaskAsCurrent(nextTask);
+    } else {
+      _currentGoalTask = null;
       notifyListeners();
     }
   }
