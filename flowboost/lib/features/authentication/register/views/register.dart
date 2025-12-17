@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '/services/auth_service.dart';
-
+import '../../login/views/login.dart';
 const String logoPath = 'assets/images/Backlogtable.png';
 
 class FlowboostSignUpScreen extends StatefulWidget {
@@ -235,7 +235,11 @@ class _FlowboostSignUpScreenState extends State<FlowboostSignUpScreen> {
                         style: TextStyle(color: primaryTextColor, fontSize: 16)),
                     GestureDetector(
                       onTap: () {
-                        // TODO: navigasi ke login screen
+                        Navigator.push(context,
+                        MaterialPageRoute(
+                          builder: (context) => const FlowboostLoginScreen(),
+                        ),
+                        );
                       },
                       child: const Text(
                         'Log in',
