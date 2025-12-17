@@ -1,42 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
+import '../models/goal_model.dart';
+import '../services/goal_service.dart';
 
-// --- DATA MODELS (Bisa dipindah ke file models terpisah jika mau) ---
-class SubTaskData {
-  String title;
-  bool isDone;
-  SubTaskData({required this.title, this.isDone = false});
+// Class pembantu untuk UI State (Expanded/Collapsed) yang tidak disimpan di DB
+class TaskUIState {
+  TaskModel data;
+  bool isExpanded;
+
+  TaskUIState({required this.data, this.isExpanded = false});
 }
 
-class TaskData {
-  String title;
-  List<SubTaskData> subtasks;
-  bool isExpanded; // Agar saat diedit bisa dibuka/tutup
-
-  TaskData({
-    required this.title,
-    required this.subtasks,
-    this.isExpanded = false,
-  });
-}
-
-// --- CONTROLLER ---
 class EditGoalController extends ChangeNotifier {
-  // Text Controllers untuk Input
-  final TextEditingController goalTitleController = TextEditingController(text: "Belajar Membaca");
-  final TextEditingController rewardController = TextEditingController(text: "Vacation to Japan");
+  final GoalService _goalService = GoalService();
+  
+  // Controller untuk field input
+  late TextEditingController goalTitleController;
+  late TextEditingController rewardController;
 
-  // Data Tasks (Init dengan data dummy seperti sebelumnya)
-  List<TaskData> tasks = [
-    TaskData(
-      title: 'Membaca Buku',
-      isExpanded: true, // Default terbuka agar terlihat seperti Image 2
-      subtasks: [
-        SubTaskData(title: 'Belajar Abjad'),
-        SubTaskData(title: 'Belajar Pengejaan'),
-        SubTaskData(title: 'Belajar Kosa Kata'),
-      ],
-    ),
-  ];
+  // List Task dengan wrapper UI State
+  List<TaskUIState> tasks = [];
+  
+  // Data Goal asli untuk referensi update
+  GoalModel? _originalGoal;
+
+  EditGoalController() {
+    goalTitleController = TextEditingController();
+    rewardController = TextEditingController();
+  }
+
+  // --- INIT DATA DARI FIREBASE ---
+  void loadGoal(GoalModel goal) {
+    _originalGoal = goal;
+    goalTitleController.text = goal.title;
+    rewardController.text = goal.reward;
+
+    // Mapping data model ke UI State
+    tasks = goal.tasks.map((t) => TaskUIState(
+      data: t, // Menggunakan referensi object yang sama
+      isExpanded: false
+    )).toList();
+    
+    notifyListeners();
+  }
 
   @override
   void dispose() {
@@ -45,45 +51,83 @@ class EditGoalController extends ChangeNotifier {
     super.dispose();
   }
 
-  // --- LOGIC ACTIONS ---
+  // --- LOGIC UI ACTIONS ---
 
-  // 1. Tambah Task Baru (Parent)
   void addNewTask() {
-    tasks.add(TaskData(title: "", subtasks: [], isExpanded: true));
+    tasks.add(TaskUIState(
+      data: TaskModel(
+        id: const Uuid().v4(), 
+        title: "", 
+        subtasks: []
+      ),
+      isExpanded: true,
+    ));
     notifyListeners();
   }
 
-  // 2. Hapus Task
   void deleteTask(int index) {
     tasks.removeAt(index);
     notifyListeners();
   }
 
-  // 3. Tambah Subtask ke dalam Task tertentu
   void addSubTask(int taskIndex) {
-    tasks[taskIndex].subtasks.add(SubTaskData(title: ""));
+    tasks[taskIndex].data.subtasks.add(SubTaskModel(title: "", id: ''));
     notifyListeners();
   }
 
-  // 4. Hapus Subtask
   void deleteSubTask(int taskIndex, int subIndex) {
-    tasks[taskIndex].subtasks.removeAt(subIndex);
+    tasks[taskIndex].data.subtasks.removeAt(subIndex);
     notifyListeners();
   }
 
-  // 5. Expand/Collapse Task (Opsional, tapi bagus untuk UI)
   void toggleTaskExpansion(int index) {
     tasks[index].isExpanded = !tasks[index].isExpanded;
     notifyListeners();
   }
   
-  // 6. Update Judul Task (Saat diketik)
   void updateTaskTitle(int index, String val) {
-    tasks[index].title = val;
+    tasks[index].data.title = val;
   }
 
-  // 7. Update Judul Subtask
   void updateSubTaskTitle(int taskIndex, int subIndex, String val) {
-    tasks[taskIndex].subtasks[subIndex].title = val;
+    tasks[taskIndex].data.subtasks[subIndex].title = val;
+  }
+
+  // --- LOGIC SIMPAN KE FIREBASE ---
+  Future<void> saveGoal(BuildContext context) async {
+    if (_originalGoal == null) return;
+    
+    // Validasi sederhana
+    if (goalTitleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Judul Goal tidak boleh kosong'))
+      );
+      return;
+    }
+
+    try {
+      // Update object asli dengan data baru dari form
+      _originalGoal!.title = goalTitleController.text;
+      _originalGoal!.reward = rewardController.text;
+      
+      // Ambil list TaskModel dari wrapper TaskUIState
+      _originalGoal!.tasks = tasks.map((ui) => ui.data).toList();
+
+      // Panggil Service Update
+      await _goalService.updateGoal(_originalGoal!);
+
+      if (context.mounted) {
+        Navigator.pop(context); // Kembali ke layar sebelumnya
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Goal updated successfully!'))
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating goal: $e'))
+        );
+      }
+    }
   }
 }
