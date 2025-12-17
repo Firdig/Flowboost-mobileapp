@@ -1,80 +1,104 @@
 import 'package:flutter/material.dart';
+import '../models/goal_model.dart';
+import '../services/goal_service.dart';
 
-// --- MODEL ---
-class SubTaskData {
-  String title;
-  bool isDone;
-  SubTaskData({required this.title, this.isDone = false});
-}
-
-class TaskData {
-  String title;
-  List<SubTaskData> subtasks;
+// Class pembantu untuk UI State (Expanded/Collapsed)
+class TaskDetailState {
+  TaskModel data;
   bool isExpanded;
 
-  TaskData({required this.title, required this.subtasks, this.isExpanded = false});
-
-  int get completedCount => subtasks.where((s) => s.isDone).length;
-  bool get isAllDone => subtasks.isNotEmpty && subtasks.every((s) => s.isDone);
+  TaskDetailState({required this.data, this.isExpanded = false});
 }
 
-// --- CONTROLLER ---
 class GoalDetailController extends ChangeNotifier {
-  // Data (State)
-  List<TaskData> tasks = [
-    TaskData(
-      title: 'Task 1: Membaca Buku',
-      isExpanded: true,
-      subtasks: [
-        SubTaskData(title: 'Sub-task 1: Belajar Abjad', isDone: true),
-        SubTaskData(title: 'Sub-task 2: Belajar Pengejaan', isDone: true),
-        SubTaskData(title: 'Sub-task 3: Belajar Kosa Kata', isDone: true),
-      ],
-    ),
-    TaskData(
-      title: 'Task 2: Memahami Kalimat',
-      subtasks: [
-        SubTaskData(title: 'Sub-task 1: Kalimat Sederhana'),
-        SubTaskData(title: 'Sub-task 2: Tanda Baca'),
-      ],
-    ),
-  ];
+  final GoalService _goalService = GoalService();
+  
+  // Data Goal Utama
+  late GoalModel currentGoal;
+  
+  // List Wrapper untuk menangani state UI (seperti expand/collapse)
+  List<TaskDetailState> taskStates = [];
 
-  // Getters untuk perhitungan
+  // Init Data
+  void init(GoalModel goal) {
+    currentGoal = goal;
+    // Map data task asli ke TaskDetailState agar punya properti isExpanded
+    taskStates = goal.tasks.map((t) => TaskDetailState(
+      data: t,
+      isExpanded: true // Default terbuka agar user langsung lihat subtask
+    )).toList();
+    notifyListeners();
+  }
+
+  // --- GETTERS (Untuk UI) ---
+  
+  // Hitung total progress (berdasarkan task atau subtask sesuai preferensi)
+  // Di sini saya hitung berdasarkan persentase subtask yang selesai dari total semua subtask
   double get overallProgress {
     int totalSubtasks = 0;
-    int totalDone = 0;
-    for (var task in tasks) {
-      totalSubtasks += task.subtasks.length;
-      totalDone += task.completedCount;
+    int completedSubtasks = 0;
+
+    for (var t in currentGoal.tasks) {
+      // Jika task tidak punya subtask, kita anggap task itu sendiri sebagai 1 unit
+      if (t.subtasks.isEmpty) {
+        totalSubtasks++;
+        if (t.isCompleted) completedSubtasks++;
+      } else {
+        totalSubtasks += t.subtasks.length;
+        completedSubtasks += t.subtasks.where((s) => s.isCompleted).length;
+      }
     }
+
     if (totalSubtasks == 0) return 0.0;
-    return totalDone / totalSubtasks;
+    return completedSubtasks / totalSubtasks;
   }
   
-  int get overallPercentage => (overallProgress * 100).toInt();
-  int get totalDoneCount => tasks.fold<int>(0, (sum, t) => sum + t.completedCount);
-  int get totalTaskCount => tasks.fold<int>(0, (sum, t) => sum + t.subtasks.length);
+  String get progressPercentage => (overallProgress * 100).toStringAsFixed(0);
 
-  // --- ACTIONS / LOGIC ---
-  
+  // --- ACTIONS ---
+
   void toggleExpand(int index) {
-    tasks[index].isExpanded = !tasks[index].isExpanded;
-    notifyListeners(); // Memberitahu UI untuk update
+    taskStates[index].isExpanded = !taskStates[index].isExpanded;
+    notifyListeners();
   }
 
-  void toggleSubtask(int taskIndex, int subIndex) {
-    var subtask = tasks[taskIndex].subtasks[subIndex];
-    subtask.isDone = !subtask.isDone;
-    notifyListeners(); // Update UI (progress bar berubah)
+  // 1. Toggle Subtask (Check/Uncheck)
+  Future<void> toggleSubtask(int taskIndex, int subIndex) async {
+    var subtask = currentGoal.tasks[taskIndex].subtasks[subIndex];
+    subtask.isCompleted = !subtask.isCompleted;
+    
+    // Cek apakah semua subtask di task ini selesai? Jika ya, tandai parent task selesai
+    bool allDone = currentGoal.tasks[taskIndex].subtasks.every((s) => s.isCompleted);
+    currentGoal.tasks[taskIndex].isCompleted = allDone;
+
+    notifyListeners();
+    await _saveChanges();
   }
 
-  void toggleMarkAll(int taskIndex) {
-    var task = tasks[taskIndex];
-    bool newState = !task.isAllDone;
-    for (var s in task.subtasks) {
-      s.isDone = newState;
+  // 2. Mark All as Done (untuk satu Task)
+  Future<void> markAllDone(int taskIndex) async {
+    var task = currentGoal.tasks[taskIndex];
+    
+    // Cek logika: Jika sudah semua done, maka unmark semua. Jika belum, mark semua.
+    bool isAllCurrentlyDone = task.subtasks.every((s) => s.isCompleted);
+    bool newState = !isAllCurrentlyDone;
+
+    for (var sub in task.subtasks) {
+      sub.isCompleted = newState;
     }
-    notifyListeners(); // Update UI
+    task.isCompleted = newState;
+
+    notifyListeners();
+    await _saveChanges();
+  }
+
+  // Simpan ke Firebase
+  Future<void> _saveChanges() async {
+    await _goalService.updateGoal(currentGoal);
+  }
+
+  Future<void> deleteGoal(BuildContext context) async {
+    if (currentGoal.id == null) return;
+    await _goalService.deleteGoal(currentGoal.id!);
   }
 }
