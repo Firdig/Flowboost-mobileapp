@@ -43,8 +43,160 @@ class _PomodoroAppBar extends StatelessWidget {
   }
 }
 
-class _PomodoroBody extends StatelessWidget {
+class _PomodoroBody extends StatefulWidget {
   const _PomodoroBody();
+
+  @override
+  State<_PomodoroBody> createState() => _PomodoroBodyState();
+}
+
+class _PomodoroBodyState extends State<_PomodoroBody> {
+  
+  // ✅ FUNCTION: Menampilkan Popup Settings
+  void _showSettingsDialog(BuildContext context) {
+    final provider = Provider.of<PomodoroProvider>(context, listen: false);
+    
+    // Controllers untuk Input Menit
+    final pomodoroController = TextEditingController(text: provider.pomodoroMinutes.toString());
+    final shortBreakController = TextEditingController(text: provider.shortBreakMinutes.toString());
+    final longBreakController = TextEditingController(text: provider.longBreakMinutes.toString());
+    
+    // Local State untuk Switch (Auto Start)
+    bool autoStartBreak = provider.autoStartBreak;
+    bool autoStartPomodoro = provider.autoStartPomodoro;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: kBackgroundColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Settings', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        )
+                      ],
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 10),
+
+                    // --- SECTION: TIMER (Minutes) ---
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('TIMER (minutes)', style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w600)),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    _buildTimeSettingRow('Pomodoro', pomodoroController),
+                    const SizedBox(height: 12),
+                    _buildTimeSettingRow('Short Break', shortBreakController),
+                    const SizedBox(height: 12),
+                    _buildTimeSettingRow('Long Break', longBreakController),
+
+                    const SizedBox(height: 24),
+
+                    // --- SECTION: AUTO START ---
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('AUTO START', style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w600)),
+                    ),
+                    const SizedBox(height: 10),
+                    
+                    SwitchListTile(
+                      title: const Text('Auto-start Breaks?', style: TextStyle(fontWeight: FontWeight.w500)),
+                      value: autoStartBreak,
+                      activeColor: kPomodoroPrimaryColor,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (val) => setState(() => autoStartBreak = val),
+                    ),
+                    SwitchListTile(
+                      title: const Text('Auto-start Pomodoro?', style: TextStyle(fontWeight: FontWeight.w500)),
+                      value: autoStartPomodoro,
+                      activeColor: kPomodoroPrimaryColor,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (val) => setState(() => autoStartPomodoro = val),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Tombol Save
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // Validasi sederhana & Save ke Provider
+                          final pomo = int.tryParse(pomodoroController.text) ?? 25;
+                          final short = int.tryParse(shortBreakController.text) ?? 5;
+                          final long = int.tryParse(longBreakController.text) ?? 15;
+
+                          provider.updateSettings(
+                            pomodoroMinutes: pomo,
+                            shortBreakMinutes: short,
+                            longBreakMinutes: long,
+                            autoStartBreak: autoStartBreak,
+                            autoStartPomodoro: autoStartPomodoro,
+                          );
+                          
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black87,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Helper Widget untuk Row Input Waktu
+  Widget _buildTimeSettingRow(String label, TextEditingController controller) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+        Container(
+          width: 80,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+            ),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -118,31 +270,71 @@ class _PomodoroBody extends StatelessWidget {
                     // Timer Display
                     Column(
                       children: [
-                        provider.isEditingTimerUi
-                            ? const _TimerEditUi()
-                            : const _TimerDisplayUi(),
+                        // ✅ GANTI: Langsung panggil _TimerDisplayUi (karena edit inline dihapus)
+                        const _TimerDisplayUi(),
                         const SizedBox(height: 30),
-                        // Tombol Start/Pause/Save
-                        RetroButtonPomodoro(
-                          text: provider.isEditingTimerUi ? 'Save' : (provider.isRunning ? 'Pause' : 'Start'),
-                          width: 150,
-                          onPressed: () {
-                            if (provider.isEditingTimerUi) {
-                              provider.saveTimerSetting();
-                            } else {
-                              provider.toggleTimer();
-                            }
-                          },
+                        
+                        // Tombol Start/Pause & Skip
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Tombol Start/Pause
+                              Expanded(
+                                flex: 3,
+                                child: RetroButtonPomodoro(
+                                  text: provider.isRunning ? 'Pause' : 'Start',
+                                  onPressed: provider.toggleTimer,
+                                ),
+                              ),
+                              
+                              // ✅ PERBAIKAN UI: Tombol Skip hanya muncul jika timer berjalan
+                              if (provider.isRunning) ...[
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  flex: 1,
+                                  child: InkWell(
+                                    onTap: provider.skipTimer,
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Container(
+                                      height: 54,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: Colors.grey.shade300, 
+                                          width: 1.5
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.05),
+                                            offset: const Offset(0, 4),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        Icons.skip_next_rounded, 
+                                        size: 32, 
+                                        color: Colors.black87
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                    // Icon Settings
+                    // ✅ UPDATE: Icon Settings Membuka Popup
                     Positioned(
                       top: -8,
                       right: 0,
                       child: IconButton(
                         icon: const Icon(Icons.settings, size: 28, color: Colors.black87),
-                        onPressed: provider.toggleEditTimerUi,
+                        onPressed: () => _showSettingsDialog(context),
                         padding: EdgeInsets.zero,
                       ),
                     ),
@@ -154,17 +346,18 @@ class _PomodoroBody extends StatelessWidget {
 
           const SizedBox(height: 30),
 
-          // --- Task Section Header ---
+          // --- Task Section Header & List ---
+          // (Bagian ini tidak berubah dari kode sebelumnya)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Task', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              // Tambahkan tombol show all jika perlu
             ],
           ),
           const Divider(thickness: 1, color: Colors.black54),
           const SizedBox(height: 10),
 
-          // --- Task List ---
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -172,17 +365,18 @@ class _PomodoroBody extends StatelessWidget {
             separatorBuilder: (context, index) => const SizedBox(height: 15),
             itemBuilder: (context, index) {
               final task = provider.tasks[index];
+              // Pastikan class _TaskEditForm dan _TaskItem masih ada di file ini
+              // (Kode mereka tidak berubah, hanya pemanggilan di sini)
               if (provider.editingTaskId == task.id) {
-                return _TaskEditForm(task: task);
+                 return _TaskEditForm(task: task); // Pastikan widget ini ada di bawah
               }
-              return _TaskItem(task: task);
+              return _TaskItem(task: task); // Pastikan widget ini ada di bawah
             },
           ),
 
           const SizedBox(height: 20),
 
           // --- Add Task Button ---
-          // Hanya tampilkan jika tidak sedang menambah atau mengedit task
           if (provider.editingTaskId == null)
             InkWell(
               onTap: provider.startAddingTask,
@@ -213,6 +407,7 @@ class _PomodoroBody extends StatelessWidget {
 }
 
 // --- Timer Display UI ---
+// (Tidak ada perubahan di sini, tapi pastikan ada di file)
 class _TimerDisplayUi extends StatelessWidget {
   const _TimerDisplayUi();
 
@@ -240,6 +435,11 @@ class _TimerDisplayUi extends StatelessWidget {
             Text(
               '#$currentSession',
               style: TextStyle(fontSize: 18, color: Colors.grey.shade700),
+            ),
+          if (provider.currentMode != PomodoroMode.pomodoro)
+             Text(
+              provider.currentMode == PomodoroMode.shortBreak ? 'Short Break' : 'Long Break',
+              style: TextStyle(fontSize: 18, color: kPomodoroPrimaryColor, fontWeight: FontWeight.bold),
             ),
         ],
       ),
@@ -1779,11 +1979,13 @@ class _TaskEditFormState extends State<_TaskEditForm> {
           const SizedBox(height: 10),
 
           // ✅ SEKARANG (selalu tampil saat editing)
-          TextButton.icon(
-            onPressed: _showChooseGoalDialog,
-            icon: const Icon(Icons.add, color: Colors.black54, size: 20),
-            label: const Text('Use Goals', style: TextStyle(color: Colors.black54, fontSize: 14)),
-          ),
+          if (widget.task.title.isEmpty)
+            TextButton.icon(
+              onPressed: _showChooseGoalDialog,
+              icon: const Icon(Icons.add, color: Colors.black54, size: 20),
+              label: const Text('Use Goals', style: TextStyle(color: Colors.black54, fontSize: 14)),
+            ),
+            
           const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,

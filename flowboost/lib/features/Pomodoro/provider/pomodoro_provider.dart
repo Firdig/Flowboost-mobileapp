@@ -13,11 +13,17 @@ class PomodoroProvider with ChangeNotifier {
   Duration _currentDuration = const Duration(minutes: 25);
   PomodoroMode _currentMode = PomodoroMode.pomodoro;
   bool _isRunning = false;
-  bool _isEditingTimerUi = false;
 
-  final Duration _defaultPomodoro = const Duration(minutes: 25);
-  final Duration _defaultShortBreak = const Duration(minutes: 5);
-  final Duration _defaultLongBreak = const Duration(minutes: 15);
+  // Settings Duration (Default)
+  Duration _pomodoroDuration = const Duration(minutes: 25);
+  Duration _shortBreakDuration = const Duration(minutes: 5);
+  Duration _longBreakDuration = const Duration(minutes: 15);
+
+  // ✅ NEW: Auto Start Settings
+  bool _autoStartBreak = false;
+  bool _autoStartPomodoro = false;
+
+  int _cycleCount = 0;
 
   // --- TASK STATE ---
   final List<PomodoroTask> _tasks = [
@@ -60,14 +66,8 @@ class PomodoroProvider with ChangeNotifier {
 
   String? _selectedTaskId;
   String? _editingTaskId;
-
-  // ✅ Track task induk yang harus disembunyikan
   final Set<String> _hiddenParentTaskIds = {};
-
-  // Task yang sedang berjalan untuk goals
   PomodoroTask? _currentGoalTask;
-
-  // Antrian task untuk goals
   final List<PomodoroTask> _taskQueue = [];
 
   // Constructor
@@ -81,20 +81,17 @@ class PomodoroProvider with ChangeNotifier {
   Duration get currentDuration => _currentDuration;
   PomodoroMode get currentMode => _currentMode;
   bool get isRunning => _isRunning;
-  bool get isEditingTimerUi => _isEditingTimerUi;
+  
+  // Getters for Settings
+  int get pomodoroMinutes => _pomodoroDuration.inMinutes;
+  int get shortBreakMinutes => _shortBreakDuration.inMinutes;
+  int get longBreakMinutes => _longBreakDuration.inMinutes;
+  bool get autoStartBreak => _autoStartBreak;
+  bool get autoStartPomodoro => _autoStartPomodoro;
 
-  // ✅ Getter tasks yang otomatis filter task induk yang disembunyikan
-  List<PomodoroTask> get tasks {
-    return _tasks.where((task) => !_hiddenParentTaskIds.contains(task.id)).toList();
-  }
-
-  // ✅ Getter untuk semua tasks (tanpa filter)
+  // (Getters Task tetap sama)
+  List<PomodoroTask> get tasks => _tasks.where((task) => !_hiddenParentTaskIds.contains(task.id)).toList();
   List<PomodoroTask> get allTasks => _tasks;
-
-  String? get editingTaskId => _editingTaskId;
-  PomodoroTask? get currentGoalTask => _currentGoalTask;
-  List<PomodoroTask> get taskQueue => _taskQueue;
-
   PomodoroTask? get selectedTask {
     if (_selectedTaskId == null) return null;
     try {
@@ -103,8 +100,9 @@ class PomodoroProvider with ChangeNotifier {
       return null;
     }
   }
-
+  String? get editingTaskId => _editingTaskId;
   bool get hasRunningTask => _currentGoalTask != null;
+
 
   // --- TIMER LOGIC ---
   void toggleTimer() {
@@ -136,8 +134,14 @@ class PomodoroProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // ✅ LOGIKA TRANSISI DENGAN AUTO START
   void completeSession() {
-    pauseTimer();
+    // 1. Stop timer dulu
+    _timer?.cancel();
+    _timer = null;
+    _isRunning = false;
+
+    // 2. Update Progress Task
     if (_currentMode == PomodoroMode.pomodoro && selectedTask != null) {
       final index = _tasks.indexWhere((t) => t.id == _selectedTaskId);
       if (index != -1) {
@@ -147,36 +151,129 @@ class PomodoroProvider with ChangeNotifier {
         }
       }
     }
+
+    // 3. Tentukan Mode Berikutnya & Cek Auto Start
     if (_currentMode == PomodoroMode.pomodoro) {
-      setMode(PomodoroMode.shortBreak);
+      // Selesai Kerja -> Masuk Istirahat
+      _cycleCount++;
+      
+      if (_cycleCount >= 4) {
+        setMode(PomodoroMode.longBreak);
+        _cycleCount = 0;
+      } else {
+        setMode(PomodoroMode.shortBreak);
+      }
+
+      // Cek Auto Start Break
+      if (_autoStartBreak) {
+        startTimer();
+      } else {
+        notifyListeners(); // Update UI status jadi Pause
+      }
+
     } else {
+      // Selesai Istirahat -> Masuk Kerja
       setMode(PomodoroMode.pomodoro);
+
+      // Cek Auto Start Pomodoro
+      if (_autoStartPomodoro) {
+        startTimer();
+      } else {
+        notifyListeners(); // Update UI status jadi Pause
+      }
     }
+  }
+  
+  // ✅ LOGIKA SKIP DENGAN AUTO START
+  void skipTimer() {
+    _timer?.cancel();
+    _timer = null;
+    _isRunning = false;
+
+    if (_currentMode == PomodoroMode.pomodoro) {
+      // 1. Update Progress Task & Indikator UI (#1 -> #2)
+      if (_selectedTaskId != null) {
+        final index = _tasks.indexWhere((t) => t.id == _selectedTaskId);
+        if (index != -1) {
+          _tasks[index].completedSessions++;
+          // Cek jika task sudah selesai targetnya
+          if (_tasks[index].completedSessions >= _tasks[index].targetSessions) {
+            _tasks[index].isDone = true;
+          }
+        }
+      }
+
+      // 2. Tambah Global Cycle Count (untuk memicu Long Break)
+      _cycleCount++;
+      
+      // 3. Tentukan Break (Short/Long)
+      if (_cycleCount >= 4) {
+        setMode(PomodoroMode.longBreak);
+        _cycleCount = 0; 
+      } else {
+        setMode(PomodoroMode.shortBreak);
+      }
+      
+      // Auto Start Break jika aktif
+      if (_autoStartBreak) startTimer();
+
+    } else {
+      // Jika sedang Break, kembali ke Pomodoro
+      setMode(PomodoroMode.pomodoro);
+      
+      // Auto Start Pomodoro jika aktif
+      if (_autoStartPomodoro) startTimer();
+    }
+    
     notifyListeners();
   }
 
   void setMode(PomodoroMode mode) {
-    pauseTimer();
+    // Jangan pause di sini jika dipanggil dari completeSession/skipTimer yang mau auto-start
+    // Tapi kita butuh update duration
+    
     _currentMode = mode;
     switch (mode) {
       case PomodoroMode.pomodoro:
-        _currentDuration = _defaultPomodoro;
+        _currentDuration = _pomodoroDuration;
         break;
       case PomodoroMode.shortBreak:
-        _currentDuration = _defaultShortBreak;
+        _currentDuration = _shortBreakDuration;
         break;
       case PomodoroMode.longBreak:
-        _currentDuration = _defaultLongBreak;
+        _currentDuration = _longBreakDuration;
         break;
     }
+    // notifyListeners() dipanggil oleh pemanggil (completeSession/skipTimer/UI)
+  }
+
+  // ✅ UPDATE SETTINGS DARI POPUP
+  void updateSettings({
+    required int pomodoroMinutes,
+    required int shortBreakMinutes,
+    required int longBreakMinutes,
+    required bool autoStartBreak,
+    required bool autoStartPomodoro,
+  }) {
+    _pomodoroDuration = Duration(minutes: pomodoroMinutes);
+    _shortBreakDuration = Duration(minutes: shortBreakMinutes);
+    _longBreakDuration = Duration(minutes: longBreakMinutes);
+    _autoStartBreak = autoStartBreak;
+    _autoStartPomodoro = autoStartPomodoro;
+
+    // Reset timer saat ini ke settingan baru jika tidak sedang berjalan
+    if (!_isRunning) {
+      setMode(_currentMode); 
+    }
+    
     notifyListeners();
   }
 
-  void toggleEditTimerUi() {
-    _isEditingTimerUi = !_isEditingTimerUi;
-    pauseTimer();
-    notifyListeners();
-  }
+  // void toggleEditTimerUi() {
+  //   _isEditingTimerUi = !_isEditingTimerUi;
+  //   pauseTimer();
+  //   notifyListeners();
+  // }
 
   void adjustTime(int minutesDelta, int secondsDelta) {
     final newDuration = _currentDuration + Duration(minutes: minutesDelta, seconds: secondsDelta);
@@ -187,14 +284,41 @@ class PomodoroProvider with ChangeNotifier {
   }
 
   void saveTimerSetting() {
-    _isEditingTimerUi = false;
+    // _isEditingTimerUi = false;
+    
+    // Simpan durasi saat ini ke variabel setting mode yang sedang aktif
+    switch (_currentMode) {
+      case PomodoroMode.pomodoro:
+        _pomodoroDuration = _currentDuration;
+        break;
+      case PomodoroMode.shortBreak:
+        _shortBreakDuration = _currentDuration;
+        break;
+      case PomodoroMode.longBreak:
+        _longBreakDuration = _currentDuration;
+        break;
+    }
     notifyListeners();
   }
 
+  
   // --- TASK LOGIC ---
   void selectTask(String taskId) {
     _selectedTaskId = taskId;
-    setMode(PomodoroMode.pomodoro);
+
+    // if (_currentMode == PomodoroMode.pomodoro) {
+    //   // KONDISI 1: Sudah di mode Pomodoro (Pindah antar Task)
+    //   // - Jangan panggil setMode() agar durasi TIDAK reset (tetap mengikuti timer sebelumnya)
+    //   // - Panggil pauseTimer() agar otomatis berhenti (Auto Pause)
+    //   pauseTimer();
+    // } else {
+    //   // KONDISI 2: Dari mode Break pindah ke Task
+    //   // - Masuk mode Pomodoro (Waktu reset ke settingan awal, misal 25 menit)
+    //   // - Pause timer juga agar user siap-siap
+    //   setMode(PomodoroMode.pomodoro);
+      pauseTimer();
+    // }
+    
     notifyListeners();
   }
 
@@ -227,18 +351,15 @@ class PomodoroProvider with ChangeNotifier {
       _tasks[index].title = newTitle;
       _tasks[index].targetSessions = newTarget;
       _tasks[index].note = newNote;
-
       if (_tasks[index].completedSessions >= _tasks[index].targetSessions) {
         _tasks[index].isDone = true;
       } else {
         _tasks[index].isDone = false;
       }
-
       if (_selectedTaskId != id) {
         _selectedTaskId = id;
       }
     }
-
     _editingTaskId = null;
     notifyListeners();
   }
@@ -283,13 +404,8 @@ class PomodoroProvider with ChangeNotifier {
 
   void deleteTask(String id) {
     _tasks.removeWhere((task) => task.id == id);
-
-    if (_selectedTaskId == id) {
-      _selectedTaskId = null;
-    }
-
+    if (_selectedTaskId == id) _selectedTaskId = null;
     _hiddenParentTaskIds.remove(id);
-
     notifyListeners();
   }
 
