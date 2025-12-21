@@ -12,17 +12,14 @@ class PomodoroScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => PomodoroProvider(),
-      child: const Scaffold(
+    return const Scaffold(
         backgroundColor: kBackgroundColor,
         appBar: PreferredSize(
             preferredSize: Size.fromHeight(60),
             child: _PomodoroAppBar()
         ),
         body: _PomodoroBody(),
-      ),
-    );
+      );
   }
 }
 
