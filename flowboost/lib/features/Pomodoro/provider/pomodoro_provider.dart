@@ -3,11 +3,18 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../goals/models/goal_model.dart'; // Import GoalModel
+import '../../goals/services/goal_service.dart'; // Import GoalService
 import '../models/pomodoro_task_model.dart';
 
 enum PomodoroMode { pomodoro, shortBreak, longBreak }
 
 class PomodoroProvider with ChangeNotifier {
+  //Service Goals
+  final GoalService _goalService = GoalService();
+  StreamSubscription<List<GoalModel>>? _goalsSubscription;
+  List<GoalModel> _firestoreGoals = [];
+  
   // --- TIMER STATE ---
   Timer? _timer;
   Duration _currentDuration = const Duration(minutes: 25);
@@ -26,43 +33,7 @@ class PomodoroProvider with ChangeNotifier {
   int _cycleCount = 0;
 
   // --- TASK STATE ---
-  final List<PomodoroTask> _tasks = [
-    PomodoroTask(
-      title: 'Belajar Javascript',
-      targetSessions: 4,
-      completedSessions: 0,
-      subTasks: [
-        SubTask(title: 'Task 1 : Introduction to JavaScript', targetSessions: 3, completedSessions: 0),
-        SubTask(title: 'Task 2 : Variables and Data Types', targetSessions: 3, completedSessions: 0),
-        SubTask(title: 'Task 3 : Functions and Scope', targetSessions: 3, completedSessions: 0),
-        SubTask(title: 'Task 4 : ES6 Features', targetSessions: 3, completedSessions: 0),
-      ],
-    ),
-    PomodoroTask(
-      title: 'Belajar CSS',
-      targetSessions: 4,
-      completedSessions: 4,
-      isDone: true,
-      subTasks: [
-        SubTask(title: 'Task 1 : Introduction to CSS', targetSessions: 3, completedSessions: 3, isDone: true),
-        SubTask(title: 'Task 2 : CSS Selectors', targetSessions: 3, completedSessions: 3, isDone: true),
-        SubTask(title: 'Task 3 : CSS Flexbox', targetSessions: 3, completedSessions: 3, isDone: true),
-        SubTask(title: 'Task 4 : CSS Grid', targetSessions: 3, completedSessions: 3, isDone: true),
-      ],
-    ),
-    PomodoroTask(
-      title: 'Belajar React',
-      targetSessions: 6,
-      completedSessions: 2,
-      note: 'Fokus pada hooks',
-      subTasks: [
-        SubTask(title: 'Task 1 : React Basics', targetSessions: 3, completedSessions: 3, isDone: true),
-        SubTask(title: 'Task 2 : Components and Props', targetSessions: 3, completedSessions: 2),
-        SubTask(title: 'Task 3 : State and Lifecycle', targetSessions: 3, completedSessions: 0),
-        SubTask(title: 'Task 4 : Hooks (useState, useEffect)', targetSessions: 3, completedSessions: 0),
-      ],
-    ),
-  ];
+  final List<PomodoroTask> _tasks = [];
 
   String? _selectedTaskId;
   String? _editingTaskId;
@@ -72,11 +43,20 @@ class PomodoroProvider with ChangeNotifier {
 
   // Constructor
   PomodoroProvider() {
-    if (_tasks.isNotEmpty) {
-      _selectedTaskId = _tasks.first.id;
-    }
+    _initGoalsListener();
   }
-
+  void _initGoalsListener() {
+    _goalsSubscription = _goalService.getGoalsStream().listen((goals) {
+      _firestoreGoals = goals;
+      notifyListeners();
+    });
+  }
+  @override
+  void dispose() {
+    _goalsSubscription?.cancel();
+    _timer?.cancel();
+    super.dispose();
+  }
   // --- GETTERS ---
   Duration get currentDuration => _currentDuration;
   PomodoroMode get currentMode => _currentMode;
@@ -91,7 +71,11 @@ class PomodoroProvider with ChangeNotifier {
 
   // (Getters Task tetap sama)
   List<PomodoroTask> get tasks => _tasks.where((task) => !_hiddenParentTaskIds.contains(task.id)).toList();
-  List<PomodoroTask> get allTasks => _tasks;
+  List<PomodoroTask> get allTasks => _tasks; // Untuk keperluan debugging internal
+  
+  // Getter untuk Goals dari Firestore
+  List<GoalModel> get firestoreGoals => _firestoreGoals;
+  
   PomodoroTask? get selectedTask {
     if (_selectedTaskId == null) return null;
     try {
@@ -136,12 +120,10 @@ class PomodoroProvider with ChangeNotifier {
 
   // ✅ LOGIKA TRANSISI DENGAN AUTO START
   void completeSession() {
-    // 1. Stop timer dulu
     _timer?.cancel();
     _timer = null;
     _isRunning = false;
 
-    // 2. Update Progress Task
     if (_currentMode == PomodoroMode.pomodoro && selectedTask != null) {
       final index = _tasks.indexWhere((t) => t.id == _selectedTaskId);
       if (index != -1) {
@@ -152,35 +134,20 @@ class PomodoroProvider with ChangeNotifier {
       }
     }
 
-    // 3. Tentukan Mode Berikutnya & Cek Auto Start
     if (_currentMode == PomodoroMode.pomodoro) {
-      // Selesai Kerja -> Masuk Istirahat
       _cycleCount++;
-      
       if (_cycleCount >= 4) {
         setMode(PomodoroMode.longBreak);
         _cycleCount = 0;
       } else {
         setMode(PomodoroMode.shortBreak);
       }
-
-      // Cek Auto Start Break
-      if (_autoStartBreak) {
-        startTimer();
-      } else {
-        notifyListeners(); // Update UI status jadi Pause
-      }
-
+      if (_autoStartBreak) startTimer();
+      else notifyListeners();
     } else {
-      // Selesai Istirahat -> Masuk Kerja
       setMode(PomodoroMode.pomodoro);
-
-      // Cek Auto Start Pomodoro
-      if (_autoStartPomodoro) {
-        startTimer();
-      } else {
-        notifyListeners(); // Update UI status jadi Pause
-      }
+      if (_autoStartPomodoro) startTimer();
+      else notifyListeners();
     }
   }
   
@@ -283,23 +250,23 @@ class PomodoroProvider with ChangeNotifier {
     }
   }
 
-  void saveTimerSetting() {
-    // _isEditingTimerUi = false;
+  // void saveTimerSetting() {
+  //   // _isEditingTimerUi = false;
     
-    // Simpan durasi saat ini ke variabel setting mode yang sedang aktif
-    switch (_currentMode) {
-      case PomodoroMode.pomodoro:
-        _pomodoroDuration = _currentDuration;
-        break;
-      case PomodoroMode.shortBreak:
-        _shortBreakDuration = _currentDuration;
-        break;
-      case PomodoroMode.longBreak:
-        _longBreakDuration = _currentDuration;
-        break;
-    }
-    notifyListeners();
-  }
+  //   // Simpan durasi saat ini ke variabel setting mode yang sedang aktif
+  //   switch (_currentMode) {
+  //     case PomodoroMode.pomodoro:
+  //       _pomodoroDuration = _currentDuration;
+  //       break;
+  //     case PomodoroMode.shortBreak:
+  //       _shortBreakDuration = _currentDuration;
+  //       break;
+  //     case PomodoroMode.longBreak:
+  //       _longBreakDuration = _currentDuration;
+  //       break;
+  //   }
+  //   notifyListeners();
+  // }
 
   
   // --- TASK LOGIC ---

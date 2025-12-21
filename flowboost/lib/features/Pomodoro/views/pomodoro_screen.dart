@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../common/constants/constants.dart';
+import '../../goals/models/goal_model.dart';
 import '../provider/pomodoro_provider.dart';
 import '../models/pomodoro_task_model.dart';
 import '../widgets/pomodoro_widget.dart';
@@ -1177,19 +1178,19 @@ class _TaskEditFormState extends State<_TaskEditForm> {
 // Fungsi untuk menampilkan popup Choose Goal (Level 1)
 // Hanya menampilkan task GOALS (task dengan subTasks)
   Future<void> _showChooseGoalDialog() async {
-    final provider = Provider.of<PomodoroProvider>(context, listen: false);
+    final pomodoroProvider = Provider.of<PomodoroProvider>(context, listen: false);
     String? selectedGoalId;
 
-    // ✅ PERBAIKAN: Gunakan allTasks untuk akses semua task termasuk yang hidden
-    final goalTasks = provider.allTasks.where((t) {
-      return t.subTasks != null && t.subTasks!.isNotEmpty;
-    }).toList();
+    // 1. Ambil Goals dari provider DAN Filter yang belum selesai
+    final unfinishedGoals = pomodoroProvider.firestoreGoals
+        .where((goal) => !goal.isFinished) // Hanya goals yang belum 100%
+        .toList();
 
-    // Jika tidak ada goal yang tersedia
-    if (goalTasks.isEmpty) {
+    // Jika tidak ada goal yang tersedia (atau semua sudah selesai)
+    if (unfinishedGoals.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Tidak ada goal yang tersedia.'),
+          content: Text('Tidak ada Goal aktif yang tersedia.'),
           duration: Duration(seconds: 2),
         ),
       );
@@ -1198,536 +1199,569 @@ class _TaskEditFormState extends State<_TaskEditForm> {
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          backgroundColor: kBackgroundColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (dialogContext) {
+        // Bungkus Dialog dengan ChangeNotifierProvider.value agar tidak error ProviderNotFound
+        return ChangeNotifierProvider.value(
+          value: pomodoroProvider, 
+          child: StatefulBuilder(
+            builder: (context, setDialogState) => Dialog(
+              backgroundColor: kBackgroundColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Choose Goal',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Choose Goal',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
+                    const SizedBox(height: 20),
+
+                    // List Goal (Hanya yang belum selesai)
+                    Container(
+                      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: unfinishedGoals.map((goal) {
+                            // Hitung persentase progress untuk ditampilkan (opsional)
+                            final percentage = (goal.progress * 100).toInt();
+                            
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: ListTile(
+                                title: Text(
+                                  goal.title,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: Text(
+                                  'Progress: $percentage%', // Menampilkan persentase progress
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                ),
+                                trailing: Icon(
+                                  Icons.check,
+                                  color: selectedGoalId == goal.id ? Colors.black : Colors.transparent,
+                                ),
+                                onTap: () {
+                                  setDialogState(() {
+                                    selectedGoalId = goal.id;
+                                  });
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Tombol Next
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: selectedGoalId == null ? null : () {
+                          Navigator.pop(context);
+                          final selectedGoal = unfinishedGoals.firstWhere((g) => g.id == selectedGoalId);
+                          _showChooseTaskDialog(selectedGoal);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPomodoroDarkButtonColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          disabledBackgroundColor: Colors.grey.shade400,
+                        ),
+                        child: const Text(
+                          'Next',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-
-                // List HANYA task goals (yang punya subTasks)
-                ...goalTasks.map((task) => Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ListTile(
-                    title: Text(
-                      task.title,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      '${task.subTasks?.length ?? 0} subtasks',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                    trailing: Icon(
-                      Icons.check,
-                      color: selectedGoalId == task.id ? Colors.black : Colors.transparent,
-                    ),
-                    onTap: () {
-                      setDialogState(() {
-                        selectedGoalId = task.id;
-                      });
-                    },
-                  ),
-                )).toList(),
-
-                const SizedBox(height: 20),
-
-                // Tombol Next
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: selectedGoalId == null ? null : () {
-                      Navigator.pop(context);
-                      final selectedTask = goalTasks.firstWhere((t) => t.id == selectedGoalId);
-                      _showChooseTaskDialog(selectedTask);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kPomodoroDarkButtonColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      disabledBackgroundColor: Colors.grey.shade400,
-                    ),
-                    child: const Text(
-                      'Next',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 // Popup Level 2: Choose Task (dari sub-tasks)
-  Future<void> _showChooseTaskDialog(PomodoroTask selectedGoal) async {
-    if (selectedGoal.subTasks == null || selectedGoal.subTasks!.isEmpty) {
-      // Jika tidak ada subtask, langsung tampilkan dialog konfirmasi
-      final hasRunningTask = _targetSessions > widget.task.completedSessions;
-      final result = await _showStartPomodoroDialog(
-          selectedGoal.targetSessions,
-          selectedGoal.title,
-          null,
-          hasRunningTask
-      );
+  Future<void> _showChooseTaskDialog(GoalModel selectedGoal) async {
+    final pomodoroProvider = Provider.of<PomodoroProvider>(context, listen: false);
 
-      // Handle hasil pilihan
-      if (result == null || result == 'cancel') {
-        return;
-      }
-
-      // Handle Replace atau Add - Update task yang dipilih
-      _handleStartPomodoroAction(
-          result,
-          selectedGoal.targetSessions,
-          selectedGoal.title,
-          selectedGoal.note
+    if (selectedGoal.tasks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Goal ini tidak memiliki task.'),
+          backgroundColor: Colors.orange,
+        ),
       );
+      _showChooseGoalDialog();
       return;
     }
 
     await showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: kBackgroundColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (dialogContext) {
+        return ChangeNotifierProvider.value(
+          value: pomodoroProvider,
+          child: Dialog(
+            backgroundColor: kBackgroundColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'Choose Task',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Header dengan nama goal yang dipilih
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      selectedGoal.title,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const Icon(Icons.check),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // List sub-tasks dengan progress
-              ...selectedGoal.subTasks!.map((subTask) {
-                final progress = '${subTask.completedSessions}/${subTask.targetSessions} done';
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Choose Task',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(dialogContext),
                       ),
                     ],
                   ),
-                  child: ListTile(
-                    leading: const Icon(Icons.chevron_right, size: 20),
-                    title: Text(
-                      subTask.title,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    trailing: Text(
-                      progress,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showSubTaskDetailDialog(selectedGoal, subTask);
-                    },
-                  ),
-                );
-              }).toList(),
-
-              const SizedBox(height: 20),
-
-              // Tombol Back
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showChooseGoalDialog(); // Kembali ke Level 1
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPomodoroDarkButtonColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            selectedGoal.title,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(Icons.check),
+                      ],
                     ),
                   ),
-                  child: const Text(
-                    'Back',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  const SizedBox(height: 16),
+                  Container(
+                    constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: selectedGoal.tasks.map((taskModel) {
+                          final completedSub = taskModel.subtasks.where((s) => s.isCompleted).length;
+                          final totalSub = taskModel.subtasks.length;
+                          final progress = '$completedSub/$totalSub done';
+              
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: ListTile(
+                              leading: const Icon(Icons.chevron_right, size: 20),
+                              title: Text(
+                                taskModel.title,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                              ),
+                              trailing: Text(
+                                progress,
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                              onTap: () {
+                                Navigator.pop(dialogContext);
+                                if (taskModel.subtasks.isNotEmpty) {
+                                  _showSubTaskDetailDialog(selectedGoal, taskModel);
+                                } else {
+                                  _processSingleTaskFromGoal(selectedGoal.title, taskModel.title);
+                                }
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(dialogContext);
+                        _showChooseGoalDialog();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPomodoroDarkButtonColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text(
+                        'Back',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
+
+  // Helper jika user memilih Task yang tidak punya subtask (langsung jadi pomodoro task)
+  Future<void> _processSingleTaskFromGoal(String goalTitle, String taskTitle) async {
+    const defaultCycles = 4; // Default siklus
+    final hasRunningTask = Provider.of<PomodoroProvider>(context, listen: false).hasRunningTask;
+    
+    final result = await _showStartPomodoroDialog(
+      defaultCycles, 
+      goalTitle, 
+      taskTitle, 
+      hasRunningTask
+    );
+
+     if (result != null && result != 'cancel') {
+      _handleStartPomodoroAction(
+        result, 
+        defaultCycles, 
+        taskTitle, // Judul task baru
+        'Goal: $goalTitle' // Note
+      );
+    }
+  }
 // Popup Level 3: Sub-Task Detail dengan pengaturan siklus
-  Future<void> _showSubTaskDetailDialog(PomodoroTask mainTask, SubTask subTask) async {
-    // State untuk menyimpan cycles tiap sub-task (maksimal 3 sub-task)
-    Map<int, int> subTaskCycles = {
-      0: 0, // Pengenalan & Konsep Dasar
-      1: 0, // Implementasi & Praktik
-      2: 0, // Review & Penguatan
-    };
+  Future<void> _showSubTaskDetailDialog(GoalModel goal, TaskModel taskModel) async {
+    final pomodoroProvider = Provider.of<PomodoroProvider>(context, listen: false);
+    
+    Map<int, int> subTaskCycles = {};
+    for (int i = 0; i < taskModel.subtasks.length; i++) {
+      subTaskCycles[i] = 0; 
+    }
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          backgroundColor: const Color(0xFFF5F1E8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.85,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Header
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (dialogContext) {
+        return ChangeNotifierProvider.value(
+          value: pomodoroProvider, // PASSING PROVIDER KE DALAM DIALOG
+          child: StatefulBuilder(
+            builder: (context, setDialogState) => Dialog(
+              backgroundColor: const Color(0xFFF5F1E8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.85,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
-                              'Choose Task',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Choose Sub-Task',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, size: 24),
+                                  onPressed: () => Navigator.pop(context),
+                                ),
+                              ],
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.close, size: 24),
-                              onPressed: () => Navigator.pop(context),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          goal.title,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          taskModel.title,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(Icons.check, size: 20),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
+                            const SizedBox(height: 16),
+                            ...List.generate(taskModel.subtasks.length, (index) {
+                              final subTask = taskModel.subtasks[index];
+                              final subTaskNumber = index + 1;
 
-                        // Selected Goal & SubTask
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      mainTask.title,
+                                      'Sub-task $subTaskNumber : ${subTask.title}',
                                       style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      subTask.title,
+                                      'Act / Siklus Pomodoro',
                                       style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 11,
                                         color: Colors.grey.shade600,
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Icons.check, size: 20),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // 3 Sub-Task Cards
-                        ...List.generate(3, (index) {
-                          final subTaskNumber = index + 1;
-                          final subTaskNames = [
-                            'Pengenalan & Konsep Dasar',
-                            'Implementasi & Praktik',
-                            'Review & Penguatan',
-                          ];
-                          final taskName = subTaskNames[index];
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Sub - task $subTaskNumber : $taskName',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Act / Siklus Pomodoro',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 120,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE8E8E8),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          '${subTaskCycles[index]}',
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w600,
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 120,
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFE8E8E8),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '${subTaskCycles[index]}',
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        border: Border.all(
-                                          color: Colors.grey.shade400,
-                                          width: 1.5,
+                                        const Spacer(),
+                                        Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            border: Border.all(
+                                              color: Colors.grey.shade400,
+                                              width: 1.5,
+                                            ),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: IconButton(
+                                            icon: const Icon(
+                                              Icons.keyboard_arrow_up,
+                                              size: 24,
+                                            ),
+                                            onPressed: () {
+                                              setDialogState(() {
+                                                subTaskCycles[index] = (subTaskCycles[index] ?? 0) + 1;
+                                              });
+                                            },
+                                            padding: EdgeInsets.zero,
+                                          ),
                                         ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: IconButton(
-                                        icon: const Icon(
-                                          Icons.keyboard_arrow_up,
-                                          size: 24,
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            border: Border.all(
+                                              color: Colors.grey.shade400,
+                                              width: 1.5,
+                                            ),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: IconButton(
+                                            icon: const Icon(
+                                              Icons.keyboard_arrow_down,
+                                              size: 24,
+                                            ),
+                                            onPressed: () {
+                                              if ((subTaskCycles[index] ?? 0) > 0) {
+                                                setDialogState(() {
+                                                  subTaskCycles[index] = (subTaskCycles[index] ?? 0) - 1;
+                                                });
+                                              }
+                                            },
+                                            padding: EdgeInsets.zero,
+                                          ),
                                         ),
-                                        onPressed: () {
-                                          setDialogState(() {
-                                            subTaskCycles[index] = subTaskCycles[index]! + 1;
-                                          });
-                                        },
-                                        padding: EdgeInsets.zero,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        border: Border.all(
-                                          color: Colors.grey.shade400,
-                                          width: 1.5,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: IconButton(
-                                        icon: const Icon(
-                                          Icons.keyboard_arrow_down,
-                                          size: 24,
-                                        ),
-                                        onPressed: () {
-                                          if (subTaskCycles[index]! > 0) {
-                                            setDialogState(() {
-                                              subTaskCycles[index] = subTaskCycles[index]! - 1;
-                                            });
-                                          }
-                                        },
-                                        padding: EdgeInsets.zero,
-                                      ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                          );
-                        }),
-                        const SizedBox(height: 10),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Bottom Buttons
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF5F1E8),
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(16),
-                      bottomRight: Radius.circular(16),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);              // Tutup Level 3
-                            _showChooseTaskDialog(mainTask);     // Buka Level 2
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3D3D3D),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Back',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            // ✅ Hitung total cycles
-                            final totalCycles = subTaskCycles.values.reduce((a, b) => a + b);
-
-                            if (totalCycles <= 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Harap pilih minimal 1 siklus Pomodoro'),
-                                  backgroundColor: Colors.red,
-                                ),
                               );
-                              return;
-                            }
-
-                            // ✅ Cek apakah ada task yang sedang berjalan
-                            final hasRunningTask = _targetSessions > widget.task.completedSessions;
-
-                            Navigator.pop(context);
-
-                            // ✅ Tampilkan dialog konfirmasi
-                            final result = await _showStartPomodoroDialog(
-                                totalCycles,
-                                mainTask.title,
-                                subTask.title,
-                                hasRunningTask
-                            );
-
-                            if (result == null || result == 'cancel') {
-                              return;
-                            }
-
-                            // ✅ Handle berdasarkan hasil pilihan user
-                            _handleMultipleSubTasksWithGoalData(
-                              mainTask,
-                              subTask,
-                              subTaskCycles,
-                              result,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3D3D3D),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Start Pomodoro',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                          ),
+                            }),
+                            const SizedBox(height: 10),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF5F1E8),
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _showChooseTaskDialog(goal);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF3D3D3D),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Back',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                int totalCycles = 0;
+                                subTaskCycles.forEach((_, val) => totalCycles += val);
+
+                                if (totalCycles <= 0) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Harap pilih minimal 1 siklus Pomodoro'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                // ✅ Sekarang Provider aman diakses karena sudah dibungkus
+                                final provider = Provider.of<PomodoroProvider>(context, listen: false);
+                                final hasRunningTask = provider.hasRunningTask || provider.editingTaskId != null;
+
+                                Navigator.pop(context);
+
+                                final result = await _showStartPomodoroDialog(
+                                    totalCycles,
+                                    goal.title,
+                                    taskModel.title,
+                                    hasRunningTask
+                                );
+
+                                if (result == null || result == 'cancel') {
+                                  return;
+                                }
+
+                                _handleMultipleSubTasksWithGoalData(
+                                  goal,
+                                  taskModel,
+                                  subTaskCycles,
+                                  result,
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF3D3D3D),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Start Pomodoro',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1735,56 +1769,37 @@ class _TaskEditFormState extends State<_TaskEditForm> {
 // 2️⃣ METHOD: Handle Multiple Sub-Tasks dengan Goal Data (NEW)
 // ============================================================================
   void _handleMultipleSubTasksWithGoalData(
-      PomodoroTask mainTask,
-      SubTask selectedSubTask,
+      GoalModel goal,
+      TaskModel taskModel,
       Map<int, int> selectedSubTaskCycles,
       String action
       ) {
     final provider = Provider.of<PomodoroProvider>(context, listen: false);
 
-    // Nama sub-task yang FIXED (sesuai gambar)
-    final fixedSubTaskNames = [
-      'Pengenalan & Konsep Dasar',
-      'Implementasi & Praktik',
-      'Review & Penguatan',
-    ];
-
-    // ✅ Konversi map ke list task info (HANYA yang memiliki cycles > 0)
     List<Map<String, dynamic>> selectedTasks = [];
+    
     selectedSubTaskCycles.forEach((index, cycles) {
-      if (cycles > 0 && index < fixedSubTaskNames.length) {
-        // ✅ PERBAIKAN FORMAT:
-        // Title: "Pengenalan & Konsep Dasar" (hanya nama sub-task)
-        // Note: "From: Task 1 : Introduction to JavaScript" (lengkap dengan Task number)
-
+      if (cycles > 0 && index < taskModel.subtasks.length) {
+        final sub = taskModel.subtasks[index];
         selectedTasks.add({
-          'title': fixedSubTaskNames[index],  // ✅ Hanya nama sub-task
+          'title': sub.title,
           'cycles': cycles,
-          'note': 'From: ${selectedSubTask.title}',  // ✅ Format: "From: Task 1 : Introduction to JavaScript"
+          'note': 'Goal: ${goal.title} > ${taskModel.title}', // Format Note: "Goal: [Goal Title] > [Task Title]"
         });
       }
     });
 
-    // ✅ Validasi: pastikan ada yang dipilih
-    if (selectedTasks.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pilih minimal 1 sub-task'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-      return;
-    }
+    if (selectedTasks.isEmpty) return;
 
-    // ✅ LOGIC UTAMA: Hapus parent → Tambah sub-tasks
+    // Hapus task yang sedang diedit/aktif jika replace
     if (action == 'replace' || action == 'add') {
-      // Step 1: HAPUS task parent
-      provider.deleteTask(widget.task.id);
+      if (widget.task.id.isNotEmpty && action == 'replace') {
+         provider.deleteTask(widget.task.id);
+      } else if (provider.editingTaskId != null && action == 'replace') {
+         provider.cancelEditingTask(); // Atau delete task kosong
+      }
 
-      // Step 2: Tambahkan semua sub-tasks sebagai task terpisah
+      // Tambahkan task ke Pomodoro List
       for (var task in selectedTasks) {
         provider.addNewTask(
           task['title'] as String,
@@ -1793,44 +1808,13 @@ class _TaskEditFormState extends State<_TaskEditForm> {
         );
       }
 
-      // Step 3: Tampilkan notifikasi
+      // Feedback Snackbar
       if (mounted) {
-        final isReplace = action == 'replace';
-        final taskCount = selectedTasks.length;
-        final totalCycles = selectedTasks.fold<int>(0, (sum, task) => sum + (task['cycles'] as int));
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  isReplace ? Icons.refresh_rounded : Icons.add_circle_rounded,
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        isReplace ? 'Task berhasil diganti' : 'Sub-task ditambahkan',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        '$taskCount task baru • $totalCycles total siklus',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: isReplace ? Colors.green : Colors.blue,
+            content: Text('${selectedTasks.length} task dari Goal ditambahkan.'),
+            backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-            margin: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
