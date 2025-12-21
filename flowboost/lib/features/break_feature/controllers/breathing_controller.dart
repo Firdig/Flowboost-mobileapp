@@ -1,6 +1,7 @@
-// breathing_controller.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
+// Import BreakService yang sudah dibuat sebelumnya
+import '../services/break_services.dart'; 
 
 class BreathingController extends ChangeNotifier {
   Timer? _timer;
@@ -45,7 +46,26 @@ class BreathingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ✅ UPDATE: Tambahkan logika simpan ke Firebase di sini
   void stopExercise() {
+    // 1. Cek apakah user sudah melakukan minimal 1 siklus
+    if (_cycles > 0) {
+      // Hitung durasi: 1 siklus = 4+4+4 = 12 detik
+      // Kita konversi ke menit (pembulatan ke atas), minimal 1 menit
+      int totalSeconds = _cycles * 12;
+      int durationMinutes = (totalSeconds / 60).ceil();
+      if (durationMinutes < 1) durationMinutes = 1;
+
+      // Panggil Service (Fire & Forget)
+      BreakService().logBreakActivity(
+        type: 'breathing',
+        durationMinutes: durationMinutes,
+      ).then((_) {
+        print("✅ Breathing activity logged: $durationMinutes mins");
+      });
+    }
+
+    // 2. Reset state (Kode lama)
     _timer?.cancel();
     _isPlaying = false;
     _seconds = 4;

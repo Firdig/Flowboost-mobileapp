@@ -346,18 +346,31 @@ class _StretchingScreenState extends State<StretchingScreen> with SingleTickerPr
   }
 
   Widget _buildActionButton(BuildContext context, StretchingController controller) {
-    return SizedBox(
-      width: double.infinity,
-      child: GestureDetector(
-        onTap: () {
-          if (controller.isLastExercise) {
-            Navigator.pop(context);
-          } else {
-            controller.nextExercise();
-            _fadeController.reset();
-            _fadeController.forward();
+  return SizedBox(
+    width: double.infinity,
+    child: GestureDetector(
+      // ✅ UBAH MENJADI ASYNC
+      onTap: () async {
+        if (controller.isLastExercise) {
+          // ✅ 1. Panggil fungsi simpan ke Firebase
+          // (Pastikan fungsi completeStretching() sudah ada di controller seperti langkah sebelumnya)
+          await controller.completeStretching(); 
+          
+          // ✅ 2. Tampilkan notifikasi kecil (Opsional)
+          if (context.mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+               const SnackBar(content: Text('Stretching completed & recorded!')),
+             );
+             // ✅ 3. Keluar dari halaman
+             Navigator.pop(context);
           }
-        },
+        } else {
+          // Logika Next Exercise
+          controller.nextExercise();
+          _fadeController.reset();
+          _fadeController.forward();
+        }
+      },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(

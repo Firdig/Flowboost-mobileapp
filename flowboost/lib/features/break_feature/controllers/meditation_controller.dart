@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-
+import '../services/break_services.dart';
 class MeditationController extends ChangeNotifier {
   static const int _totalSeconds = 300; // 5 minutes
   
@@ -28,7 +28,7 @@ class MeditationController extends ChangeNotifier {
         _seconds--;
         notifyListeners();
       } else {
-        stopTimer();
+        onTimerFinished();
       }
     });
   }
@@ -44,6 +44,20 @@ class MeditationController extends ChangeNotifier {
     _selectedMusic = music;
     notifyListeners();
   }
+  void onTimerFinished() {
+    _timer?.cancel();
+    _isPlaying = false;
+    _seconds = _totalSeconds;
+    notifyListeners();
+
+    BreakService().logBreakActivity(
+    type: 'meditation', // atau 'breathing' / 'stretching'
+    durationMinutes: 5, // Masukkan durasi yang baru dilakukan
+  ).then((_) {
+    print("Break activity saved!");
+  });
+  }
+
 
   @override
   void dispose() {

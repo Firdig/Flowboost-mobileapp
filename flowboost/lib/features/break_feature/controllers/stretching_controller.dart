@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// Import BreakService
+import '../services/break_services.dart';
 
 class StretchingController extends ChangeNotifier {
   int _currentIndex = 0;
@@ -58,5 +60,23 @@ class StretchingController extends ChangeNotifier {
       _currentIndex++;
       notifyListeners();
     }
+  }
+
+  // ✅ BARU: Panggil fungsi ini di tombol "Finish/Selesai" pada UI Stretching
+  Future<void> completeStretching() async {
+    // Hitung total durasi estimasi (misal 6 gerakan x 30 detik = 3 menit)
+    // Atau bisa kita set fix 3-5 menit
+    int estimatedDuration = 3; 
+
+    await BreakService().logBreakActivity(
+      type: 'stretching',
+      durationMinutes: estimatedDuration,
+    );
+    
+    print("✅ Stretching activity logged");
+    
+    // Reset index agar siap untuk sesi berikutnya
+    _currentIndex = 0;
+    notifyListeners();
   }
 }
