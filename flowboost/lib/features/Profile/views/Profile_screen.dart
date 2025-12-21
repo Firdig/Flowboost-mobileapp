@@ -39,15 +39,6 @@ class ProfileScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Your Statistic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Row(
-                    children: [
-                      _buildFilterText('Today', true),
-                      const SizedBox(width: 10),
-                      _buildFilterText('Week', false),
-                      const SizedBox(width: 10),
-                      _buildFilterText('Month', false),
-                    ],
-                  )
                 ],
               ),
               const SizedBox(height: 20),
