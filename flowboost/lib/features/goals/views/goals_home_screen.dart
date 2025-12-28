@@ -1,202 +1,231 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../../../common/constants/constants.dart';
-import '../../../common/widgets/custom_widgets.dart';
 import '../models/goal_model.dart';
 import '../services/goal_service.dart';
 import 'new_goal_screen.dart';
 import 'goal_detail_screen.dart';
 
-class GoalsHomeScreen extends StatelessWidget {
+class GoalsHomeScreen extends StatefulWidget {
   const GoalsHomeScreen({super.key});
 
   @override
+  State<GoalsHomeScreen> createState() => _GoalsHomeScreenState();
+}
+
+class _GoalsHomeScreenState extends State<GoalsHomeScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAnimations();
+  }
+
+  void _initializeAnimations() {
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Pastikan user sudah login sebelum mengambil data
     final user = FirebaseAuth.instance.currentUser;
     final GoalService goalService = GoalService();
 
-    // Jika user belum login, tampilkan pesan (Opsional: bisa redirect ke login)
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Goals')),
+        backgroundColor: const Color(0xFFF5F5DC),
         body: const Center(child: Text("Please login to view your goals")),
       );
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F5DC), // Background Beige (Tema Break/Dashboard)
       appBar: AppBar(
+        backgroundColor: const Color(0xFF3E4F3C), // Hijau Gelap identik dengan Dashboard
+        elevation: 0,
+        centerTitle: true,
         leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back),
         ),
-        title: const Text('Goals'),
+        title: const Text(
+          'My Goals',
+          style: TextStyle(
+            color: Colors.white, // Teks Putih agar kontras
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: 1.1,
+          ),
+        ),
       ),
-      body: StreamBuilder<List<GoalModel>>(
-        // Menggunakan stream dari service
-        stream: goalService.getGoalsStream(),
-        builder: (context, snapshot) {
-          // 1. Cek Status Koneksi
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: StreamBuilder<List<GoalModel>>(
+            stream: goalService.getGoalsStream(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          // 2. Cek Jika Ada Error (PENTING untuk debugging)
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Text(
-                  "Error: ${snapshot.error}", 
-                  style: const TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return _buildEmptyState(context);
+              }
 
-          // 3. Cek Jika Data Kosong
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _buildEmptyState(context);
-          }
+              final allGoals = snapshot.data!;
+              final inProgressGoals = allGoals.where((g) => !g.isFinished).toList();
+              final finishedGoals = allGoals.where((g) => g.isFinished).toList();
 
-          // 4. Olah Data
-          final allGoals = snapshot.data!;
-          final inProgressGoals = allGoals.where((g) => !g.isFinished).toList();
-          final finishedGoals = allGoals.where((g) => g.isFinished).toList();
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // === SECTION: IN PROGRESS ===
-                const Text('Current Goals in Progress', style: kHeaderStyle),
-                const SizedBox(height: 20),
-                
-                if (inProgressGoals.isEmpty)
-                  _buildSectionEmptyState("No goals in progress"),
-
-                // Loop data In Progress
-                ...inProgressGoals.map((goal) => _buildGoalCard(context, goal)),
-
-                const SizedBox(height: 20),
-                Center(
-                  child: RetroButton(
-                    text: 'Create New Goal +',
-                    onPressed: () => Navigator.push(
-                      context, 
-                      MaterialPageRoute(builder: (context) => const NewGoalScreen())
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 40),
-                
-                // === SECTION: FINISHED ===
-                const Text('Your Finished Goal', style: kHeaderStyle),
-                const SizedBox(height: 10),
-                
-                if (finishedGoals.isEmpty)
-                  _buildSectionEmptyState("No finished goals yet"),
-
-                // Loop data Finished
-                ...finishedGoals.map((goal) => _buildGoalCard(context, goal)),
-                
-                // Tambahan ruang di bawah agar tidak mentok
-                const SizedBox(height: 50),
-              ],
-            ),
-          );
-        },
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                children: [
+                  _buildSectionHeader('In Progress', Icons.trending_up),
+                  const SizedBox(height: 16),
+                  if (inProgressGoals.isEmpty) _buildSectionEmptyState("No active goals"),
+                  ...inProgressGoals.map((goal) => _buildModernGoalCard(context, goal)),
+                  
+                  const SizedBox(height: 32),
+                  _buildSectionHeader('Completed', Icons.task_alt),
+                  const SizedBox(height: 16),
+                  if (finishedGoals.isEmpty) _buildSectionEmptyState("No finished goals yet"),
+                  ...finishedGoals.map((goal) => _buildModernGoalCard(context, goal)),
+                  
+                  const SizedBox(height: 100), // Ruang ekstra untuk FAB
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF6C63FF),
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NewGoalScreen())),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('New Goal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
     );
   }
 
-  // Widget Tampilan Saat Data Benar-Benar Kosong
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF2C3E50)),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModernGoalCard(BuildContext context, GoalModel goal) {
+    int completedTasks = goal.tasks.where((t) => t.isCompleted).length;
+    int totalTasks = goal.tasks.length;
+    double percentage = totalTasks == 0 ? 0.0 : completedTasks / totalTasks;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => GoalDetailScreen(goal: goal))),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    goal.title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
+                  ),
+                ),
+                if (percentage >= 1.0)
+                  const Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 20),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Reward: ${goal.reward}',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF7F8C8D)),
+            ),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(
+              value: percentage,
+              backgroundColor: const Color(0xFF6C63FF).withOpacity(0.1),
+              color: const Color(0xFF6C63FF),
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('$completedTasks/$totalTasks tasks', style: const TextStyle(fontSize: 12, color: Color(0xFF7F8C8D))),
+                Text('${(percentage * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6C63FF), fontSize: 12)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.flag_outlined, size: 80, color: Colors.grey),
-          const SizedBox(height: 10),
+          Icon(Icons.flag_outlined, size: 80, color: const Color(0xFF6C63FF).withOpacity(0.3)),
+          const SizedBox(height: 16),
           const Text(
-            "There's no Goals created", 
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey)
+            "No goals created yet",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
           ),
-          const SizedBox(height: 20),
-          RetroButton(
-            text: 'Create New Goal +',
-            onPressed: () => Navigator.push(
-              context, 
-              MaterialPageRoute(builder: (context) => const NewGoalScreen())
-            ),
-          ),
+          const Text("Start your journey today!", style: TextStyle(color: Color(0xFF7F8C8D))),
         ],
       ),
     );
   }
 
-  // Widget Tampilan Kosong per Section (Progress/Finished)
   Widget _buildSectionEmptyState(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Center(
-        child: Text(text, style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
-      ),
-    );
-  }
-
-  // Widget Kartu Goal
-  Widget _buildGoalCard(BuildContext context, GoalModel goal) {
-    // Hitung ulang progress agar akurat
-    // (Misal: Task dianggap selesai jika ditandai selesai)
-    int completedTasks = goal.tasks.where((t) => t.isCompleted).length;
-    int totalTasks = goal.tasks.length;
-    
-    // Cegah pembagian dengan nol
-    double percentage = totalTasks == 0 ? 0.0 : completedTasks / totalTasks;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: RetroCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(goal.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 5),
-            const Text('progress'),
-            const SizedBox(height: 5),
-            
-            // Progress Bar
-            CustomProgressBar(percentage: percentage),
-            
-            const SizedBox(height: 5),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('$completedTasks/$totalTasks Task Complete'),
-                if (percentage >= 1.0)
-                  const Text('(Done)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-              ],
-            ),
-            const SizedBox(height: 10),
-            
-            const Text('Self Reward :', style: TextStyle(fontSize: 12, color: Colors.grey)),
-            Text(goal.reward, style: const TextStyle(fontWeight: FontWeight.bold)),
-            
-            const SizedBox(height: 20),
-            RetroButton(
-              text: 'View Goal',
-              isFullWidth: true,
-              onPressed: () => Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (context) => GoalDetailScreen(goal: goal)),
-              ),
-            ),
-          ],
-        ),
+        child: Text(text, style: const TextStyle(color: Color(0xFF7F8C8D), fontStyle: FontStyle.italic)),
       ),
     );
   }

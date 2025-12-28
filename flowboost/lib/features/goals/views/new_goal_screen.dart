@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../common/constants/constants.dart';
-import '../../../common/widgets/custom_widgets.dart';
 import '../controllers/new_goal_controller.dart';
 
 class NewGoalScreen extends StatefulWidget {
@@ -10,97 +9,203 @@ class NewGoalScreen extends StatefulWidget {
   State<NewGoalScreen> createState() => _NewGoalScreenState();
 }
 
-class _NewGoalScreenState extends State<NewGoalScreen> {
+class _NewGoalScreenState extends State<NewGoalScreen> with SingleTickerProviderStateMixin {
   final NewGoalController _controller = NewGoalController();
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAnimations();
+  }
+
+  void _initializeAnimations() {
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
+
+    _animationController.forward();
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F5DC), // Beige background konsisten
       appBar: AppBar(
-        leading: IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back)),
-        title: const Text('New Goal'),
+        backgroundColor: const Color(0xFF3E4F3C), // Hijau gelap
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+        ),
+        title: const Text(
+          'Create New Goal',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         actions: [
-          TextButton(
-            onPressed: () => _controller.createGoal(context),
-            child: const Text('Create', style: TextStyle(color: kTextColor, fontWeight: FontWeight.bold, fontSize: 18)),
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: TextButton(
+              onPressed: () => _controller.createGoal(context),
+              child: const Text(
+                'CREATE',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC4CE8F), fontSize: 14),
+              ),
+            ),
           )
         ],
       ),
       body: ListenableBuilder(
         listenable: _controller,
         builder: (context, child) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Create Your New Goal', style: kHeaderStyle),
-                const SizedBox(height: 20),
-                
-                RetroCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Set Your Goal :', style: kLabelStyle),
-                      const SizedBox(height: 10),
-                      const Text('What do you want to Achieve?', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 5),
-                      TextFormField(
+          return FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- HEADER GREETING ---
+                    const Text(
+                      'Start something great!',
+                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Define your ambition and break it down into small, manageable steps.',
+                      style: TextStyle(fontSize: 14, color: Color(0xFF7F8C8D), height: 1.4),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // --- SECTION 1: GOAL TITLE ---
+                    _buildSectionHeader('YOUR BIG AMBITION', Icons.rocket_launch_rounded),
+                    const Text(
+                      'Give your goal a clear and inspiring name.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF95A5A6), fontStyle: FontStyle.italic),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInputCard(
+                      child: TextFormField(
                         controller: _controller.goalTitleController,
-                        decoration: const InputDecoration(hintText: 'Contoh: Belajar Javascript'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        decoration: _inputDecoration('e.g., Run a 5K Marathon'),
                       ),
-                      const SizedBox(height: 15),
-                      const Text('What the progress :', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
+                    ),
+                    const SizedBox(height: 28),
 
-                      if (_controller.tasks.isEmpty)
-                         const Padding(
-                           padding: EdgeInsets.symmetric(vertical: 20),
-                           child: Center(child: Text("Belum ada task. Tekan tombol di bawah.", style: TextStyle(color: Colors.grey))),
-                         ),
-
+                    // --- SECTION 2: TASKS ---
+                    _buildSectionHeader('ACTIONABLE STEPS', Icons.format_list_bulleted_rounded),
+                    const Text(
+                      'Success is a series of small wins. Add your tasks here.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF95A5A6), fontStyle: FontStyle.italic),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    if (_controller.tasks.isEmpty)
+                      _buildEmptyState()
+                    else
                       ..._controller.tasks.asMap().entries.map((entry) {
                         return _buildTaskEditorItem(entry.key, entry.value);
                       }).toList(),
-
-                      const SizedBox(height: 15),
-                      Center(
-                        child: RetroButton(
-                          text: 'add new task +',
-                          onPressed: () => _controller.addNewTask(),
-                        ),
+                    
+                    const SizedBox(height: 8),
+                    Center(
+                      child: _buildAddButton(
+                        text: 'Add New Task',
+                        onTap: () => _controller.addNewTask(),
+                        icon: Icons.add_circle_outline_rounded,
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
+                    ),
+                    const SizedBox(height: 28),
 
-                // Bagian Reward
-                RetroCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Set Self Reward :', style: kLabelStyle),
-                      const SizedBox(height: 10),
-                      TextFormField(
+                    // --- SECTION 3: REWARD ---
+                    _buildSectionHeader('SELF REWARD', Icons.card_giftcard_rounded),
+                    const Text(
+                      'Treat yourself! What will you get when this goal is done?',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF95A5A6), fontStyle: FontStyle.italic),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInputCard(
+                      child: TextFormField(
                         controller: _controller.rewardController,
                         maxLines: 2,
-                        decoration: const InputDecoration(hintText: 'Contoh: Main game seharian'),
+                        decoration: _inputDecoration('e.g., A relaxing spa day or a new book'),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 48),
+                  ],
                 ),
-                const SizedBox(height: 50),
-              ],
+              ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF3E4F3C)),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 13, 
+            fontWeight: FontWeight.w800, 
+            color: Color(0xFF3E4F3C), 
+            letterSpacing: 1.1
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInputCard({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: _cardDecoration(),
+      child: child,
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black.withOpacity(0.05), style: BorderStyle.solid),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.assignment_add, size: 40, color: Colors.grey.withOpacity(0.5)),
+          const SizedBox(height: 8),
+          const Text("No tasks added yet.", style: TextStyle(color: Colors.grey, fontSize: 13)),
+        ],
       ),
     );
   }
@@ -109,130 +214,131 @@ class _NewGoalScreenState extends State<NewGoalScreen> {
     var task = taskState.data;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 2, offset: const Offset(0, 2))],
-      ),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: _cardDecoration(),
       child: Column(
         children: [
-          // === HEADER TASK ===
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
             child: Row(
               children: [
                 Expanded(
                   child: TextFormField(
                     initialValue: task.title,
-                    // Kunci PENTING: Gunakan ID task, bukan index
                     key: ValueKey('task_title_${task.id}'),
                     onChanged: (val) => _controller.updateTaskTitle(taskIndex, val),
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
                     decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      hintText: 'Tulis Judul Task...',
+                      border: InputBorder.none, 
+                      hintText: 'Enter task name...',
                       isDense: true,
                     ),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
-                // Toggle Expand
-                GestureDetector(
-                  onTap: () => _controller.toggleTaskExpansion(taskIndex),
-                  child: Row(
-                    children: [
-                       const Icon(Icons.description_outlined, size: 24, color: Colors.grey),
-                       const SizedBox(width: 4),
-                       Text('${task.subtasks.length}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
+                IconButton(
+                  onPressed: () => _controller.toggleTaskExpansion(taskIndex),
+                  icon: Icon(
+                    taskState.isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    color: const Color(0xFF6C63FF),
                   ),
                 ),
-                const SizedBox(width: 10),
-                // Delete Task
-                InkWell(
-                  onTap: () => _controller.deleteTask(taskIndex),
-                  child: const Icon(Icons.delete_outline, color: Colors.red),
-                )
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
+                  onPressed: () => _controller.deleteTask(taskIndex),
+                ),
               ],
             ),
           ),
-          
-          // === BODY SUBTASKS ===
           if (taskState.isExpanded) ...[
-            const Divider(height: 1, thickness: 1),
-            
-            // Loop Subtasks
-            if (task.subtasks.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(12.0),
-                child: Text("Belum ada subtask", style: TextStyle(fontSize: 12, color: Colors.grey)),
-              ),
-
+            const Divider(height: 1, indent: 16, endIndent: 16),
             ...task.subtasks.asMap().entries.map((entry) {
-              int subIndex = entry.key;
-              var subtask = entry.value;
-
-              return Container(
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Colors.black12, width: 0.5))
-                ),
+              return Padding(
+                padding: const EdgeInsets.only(left: 32, right: 12),
                 child: Row(
                   children: [
-                    // CHECKBOX (Boolean)
-                    Checkbox(
-                      value: subtask.isCompleted, 
-                      onChanged: (val) => _controller.toggleSubTaskStatus(taskIndex, subIndex),
-                      activeColor: Colors.green,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                    ),
-                    
-                    // INPUT SUBTASK
+                    const Icon(Icons.subdirectory_arrow_right_rounded, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: TextFormField(
-                        initialValue: subtask.title,
-                        // Kunci PENTING: Gunakan ID unik subtask
-                        key: ValueKey('sub_${subtask.id}'), 
-                        onChanged: (val) => _controller.updateSubTaskTitle(taskIndex, subIndex, val),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          hintText: 'Tulis subtask...',
-                          isDense: true,
-                        ),
-                        style: TextStyle(
-                          fontSize: 14,
-                          // Coret jika selesai
-                          decoration: subtask.isCompleted ? TextDecoration.lineThrough : null,
-                          color: subtask.isCompleted ? Colors.grey : Colors.black,
-                        ),
+                        initialValue: entry.value.title,
+                        key: ValueKey('sub_${entry.value.id}'),
+                        onChanged: (val) => _controller.updateSubTaskTitle(taskIndex, entry.key, val),
+                        style: const TextStyle(fontSize: 14),
+                        decoration: const InputDecoration(border: InputBorder.none, hintText: 'Add a detail...'),
                       ),
                     ),
-                    
-                    // DELETE SUBTASK
                     IconButton(
-                      icon: const Icon(Icons.close, size: 18, color: Colors.grey),
-                      onPressed: () => _controller.deleteSubTask(taskIndex, subIndex),
+                      icon: const Icon(Icons.close_rounded, size: 16, color: Colors.grey),
+                      onPressed: () => _controller.deleteSubTask(taskIndex, entry.key),
                     )
                   ],
                 ),
               );
             }).toList(),
-            
-            // Tombol Add Subtask
             InkWell(
               onTap: () => _controller.addSubTask(taskIndex),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                color: Colors.grey.shade50,
-                child: Center(
-                   child: Text('+ Tambah Subtask', style: TextStyle(color: Colors.orange.shade800, fontWeight: FontWeight.bold, fontSize: 13)),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6C63FF).withOpacity(0.05),
+                  borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(18), bottomRight: Radius.circular(18)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add, size: 14, color: Color(0xFF6C63FF)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Add sub-task', 
+                      style: TextStyle(color: const Color(0xFF6C63FF), fontWeight: FontWeight.bold, fontSize: 13)
+                    ),
+                  ],
                 ),
               ),
             ),
           ]
         ],
       ),
+    );
+  }
+
+  Widget _buildAddButton({required String text, required VoidCallback onTap, required IconData icon}) {
+    return ElevatedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(text),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF6C63FF),
+        foregroundColor: Colors.white,
+        elevation: 2,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFFBDC3C7), fontSize: 14, fontWeight: FontWeight.normal),
+      border: InputBorder.none,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+    );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
     );
   }
 }
