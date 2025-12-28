@@ -122,7 +122,7 @@ Widget build(BuildContext context) {
                       Center(
                         child: Image.asset(
                           FlowboostLoginScreen.logoPath,
-                          height: logoH,
+                          height: 300,
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.favorite,
@@ -132,36 +132,7 @@ Widget build(BuildContext context) {
                         ),
                       ),
 
-                      const SizedBox(height: 8),
-
-                      Center(
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(
-                              fontSize: titleSize,
-                              fontWeight: FontWeight.w800,
-                              color: primaryTextColor,
-                            ),
-                            children: const [
-                              TextSpan(text: 'Flowboost'),
-                              WidgetSpan(
-                                alignment: PlaceholderAlignment.top,
-                                child: Padding(
-                                  padding: EdgeInsets.only(left: 3),
-                                  child: Text(
-                                    '™',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: primaryTextColor,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                     
 
                       const SizedBox(height: 14),
 
@@ -214,32 +185,32 @@ Widget build(BuildContext context) {
                         ),
                       ),
 
-                      const SizedBox(height: 16),
+                      // const SizedBox(height: 16),
 
-                      const Text(
-                        'Or Login with :',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16, color: primaryTextColor),
-                      ),
+                      // const Text(
+                      //   'Or Login with :',
+                      //   textAlign: TextAlign.center,
+                      //   style: TextStyle(fontSize: 16, color: primaryTextColor),
+                      // ),
 
-                      const SizedBox(height: 12),
+                      // const SizedBox(height: 12),
 
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _SocialIconButton(
-                            assetPath: FlowboostLoginScreen.googleIconPath,
-                            fallback: 'G',
-                            onTap: _loading ? null : () => _run(_handleLoginGoogle),
-                          ),
-                          const SizedBox(width: 18),
-                          _SocialIconButton(
-                            assetPath: FlowboostLoginScreen.facebookIconPath,
-                            fallback: 'f',
-                            onTap: _loading ? null : () => _run(_handleLoginFacebook),
-                          ),
-                        ],
-                      ),
+                      // Row(
+                      //   mainAxisAlignment: MainAxisAlignment.center,
+                      //   children: [
+                      //     _SocialIconButton(
+                      //       assetPath: FlowboostLoginScreen.googleIconPath,
+                      //       fallback: 'G',
+                      //       onTap: _loading ? null : () => _run(_handleLoginGoogle),
+                      //     ),
+                      //     const SizedBox(width: 18),
+                      //     _SocialIconButton(
+                      //       assetPath: FlowboostLoginScreen.facebookIconPath,
+                      //       fallback: 'f',
+                      //       onTap: _loading ? null : () => _run(_handleLoginFacebook),
+                      //     ),
+                      //   ],
+                      // ),
 
                       const SizedBox(height: 18),
 

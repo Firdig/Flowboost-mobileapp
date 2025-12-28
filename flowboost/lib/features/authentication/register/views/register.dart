@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '/services/auth_service.dart';
 import '../../login/views/login.dart';
-const String logoPath = 'assets/images/Backlogtable.png';
+const String logoPath = 'assets/images/flowboost_logo.png';
 
 class FlowboostSignUpScreen extends StatefulWidget {
   const FlowboostSignUpScreen({super.key});
-
+  
   @override
   State<FlowboostSignUpScreen> createState() => _FlowboostSignUpScreenState();
 }
@@ -52,7 +52,21 @@ class _FlowboostSignUpScreenState extends State<FlowboostSignUpScreen> {
       );
 
       if (!mounted) return;
-      _showSnack('Registrasi berhasil. Kamu sudah login.');
+
+      // Karena Firebase biasanya auto-login setelah register,
+      // kalau kamu mau user diarahkan ke halaman login dan login ulang:
+      await FirebaseAuth.instance.signOut();
+
+      if (!mounted) return;
+
+      _showSnack('Registrasi berhasil. Silakan login.');
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const FlowboostLoginScreen(),
+        ),
+      );
 
       // TODO: pindah ke halaman home / login sesuai flow kamu
       // Navigator.pushReplacement(...);
@@ -116,7 +130,7 @@ class _FlowboostSignUpScreenState extends State<FlowboostSignUpScreen> {
                 Center(
                   child: Image.asset(
                     logoPath,
-                    height: 120,
+                    height: 200,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) {
                       return const Icon(Icons.broken_image, size: 80, color: Colors.black);
@@ -210,6 +224,7 @@ class _FlowboostSignUpScreenState extends State<FlowboostSignUpScreen> {
                       borderRadius: BorderRadius.circular(borderRadius),
                     ),
                   ),
+                  
                   child: _isLoading
                       ? const SizedBox(
                           height: 22,

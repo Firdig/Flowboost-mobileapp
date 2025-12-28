@@ -11,144 +11,204 @@ import '../../goals/models/goal_model.dart';
 import '../../daily_boost/screens/daily_boost_screen.dart';
 import '../../break_feature/views/break_screen.dart';
 import '../../Pomodoro/views/pomodoro_screen.dart';
-// import '../../Profile/views/Profile_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAnimations();
+  }
+
+  void _initializeAnimations() {
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // 1. Ambil data User saat ini
     final user = FirebaseAuth.instance.currentUser;
-    // Gunakan displayName, jika kosong gunakan bagian depan email, atau default 'User'
     final String userName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User';
-    
-    // Service untuk mengambil data goals
     final GoalService goalService = GoalService();
 
     return Scaffold(
-      // 2. Menggunakan AppBar agar judul "Flowboost" warnanya SAMA dengan fitur Goals
+      backgroundColor: const Color(0xFFF5F5DC), // Background Beige tema Break
       appBar: AppBar(
-        title: const Text('Flowboost'),
+        backgroundColor: const Color(0xFF3E4F3C), // Hijau gelap full width
+        elevation: 0,
         centerTitle: true,
-        automaticallyImplyLeading: false, // Menghilangkan tombol back di dashboard
+        automaticallyImplyLeading: false,
+        title: const Text(
+          'Flowboost',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            letterSpacing: 1.2,
+          ),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Sapaan User
-              Text(
-                'Hi $userName,\nHave a nice day',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 20),
-              
-              // 3. Goals Card (Logic Perbaikan)
-              StreamBuilder<List<GoalModel>>(
-                stream: goalService.getGoalsStream(),
-                builder: (context, snapshot) {
-                  // Loading state
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const RetroCard(
-                      child: SizedBox(
-                        height: 100,
-                        child: Center(child: CircularProgressIndicator()),
+          // Clamping agar tidak ada efek pantulan/scroll berlebih
+          physics: const ClampingScrollPhysics(), 
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: SlideTransition(
+              position: _slideAnimation,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+                child: Column(
+                  // Menyesuaikan dengan isi halaman secara pas
+                  mainAxisSize: MainAxisSize.min, 
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Greeting Section
+                    Text(
+                      'Hi $userName,',
+                      style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C3E50),
                       ),
-                    );
-                  }
+                    ),
+                    const Text(
+                      'Let\'s make today productive!',
+                      style: TextStyle(fontSize: 15, color: Color(0xFF7F8C8D)),
+                    ),
+                    const SizedBox(height: 24), // Jarak lebih rapat
 
-                  // Error state
-                  if (snapshot.hasError) {
-                    return RetroCard(child: Text("Error: ${snapshot.error}"));
-                  }
+                    // Goals Section
+                    StreamBuilder<List<GoalModel>>(
+                      stream: goalService.getGoalsStream(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        final activeGoals = (snapshot.data ?? []).where((g) => !g.isFinished).toList();
+                        return _buildModernGoalsCard(context, activeGoals);
+                      },
+                    ),
 
-                  // Data processing
-                  final allGoals = snapshot.data ?? [];
-                  // Filter hanya goal yang belum selesai (in progress)
-                  final activeGoals = allGoals.where((g) => !g.isFinished).toList();
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Quick Actions',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C3E50),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
-                  return _buildDynamicGoalsCard(context, activeGoals);
-                },
-              ),
-
-              const SizedBox(height: 20),
-              
-              // Menu Lainnya
-              MenuCard(
-                title: 'Daily boost',
-                subtitle: 'Meningkatkan produktivitas',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DailyBoostScreen(),
-                  ),
+                    // Menu Items (Rapi & Kompak)
+                    _buildMenuAction(
+                      context: context,
+                      title: 'Daily Boost',
+                      subtitle: 'Improve your productivity',
+                      icon: Icons.rocket_launch_outlined,
+                      colors: [const Color(0xFF6C63FF), const Color(0xFF5A52E0)],
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DailyBoostScreen())),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildMenuAction(
+                      context: context,
+                      title: 'Break Time',
+                      subtitle: 'Relax and recharge',
+                      icon: Icons.self_improvement_outlined,
+                      colors: [const Color(0xFF4CAF50), const Color(0xFF45A049)],
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const BreakScreen())),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildMenuAction(
+                      context: context,
+                      title: 'Pomodoro',
+                      subtitle: 'Deep focus sessions',
+                      icon: Icons.timer_outlined,
+                      colors: [const Color(0xFFFF9800), const Color(0xFFF57C00)],
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PomodoroScreen())),
+                    ),
+                    // Tidak ada SizedBox besar di bawah agar halaman pas dengan konten
+                  ],
                 ),
               ),
-              MenuCard(
-                title: 'Break',
-                subtitle: 'Don’t Overworked your body, Take a break',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const BreakScreen()),
-                ),
-              ),
-              MenuCard(
-                title: 'Pomodoro',
-                subtitle: 'Make your focus increase',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PomodoroScreen(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 80),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDynamicGoalsCard(BuildContext context, List<GoalModel> activeGoals) {
-    // KONDISI 1: TIDAK ADA GOAL AKTIF
+  Widget _buildModernGoalsCard(BuildContext context, List<GoalModel> activeGoals) {
     if (activeGoals.isEmpty) {
-      return RetroCard(
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: _cardDecoration(),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
+            const Icon(Icons.flag_outlined, size: 45, color: Color(0xFF6C63FF)),
+            const SizedBox(height: 12),
             const Text(
               'No Active Goals',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF2C3E50)),
             ),
-            const SizedBox(height: 8),
             const Text(
-              "You don't have any goals running. Start maximizing your potential now!",
-              style: TextStyle(fontSize: 14, color: Colors.black87),
+              'Start maximizing your potential!',
+              style: TextStyle(fontSize: 13, color: Color(0xFF7F8C8D)),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
-                  child: RetroButton(
-                    text: 'Create Goal +',
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const NewGoalScreen()),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6C63FF),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
                     ),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const NewGoalScreen())),
+                    child: const Text('Create New', style: TextStyle(color: Colors.white, fontSize: 13)),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: RetroButton(
-                    text: 'View All',
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const GoalsHomeScreen()),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF6C63FF)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const GoalsHomeScreen())),
+                    child: const Text('View Goals', style: TextStyle(color: Color(0xFF6C63FF), fontSize: 13)),
                   ),
                 ),
               ],
@@ -158,83 +218,102 @@ class DashboardScreen extends StatelessWidget {
       );
     }
 
-    // KONDISI 2: ADA GOAL AKTIF
-    // Ambil goal pertama untuk ditampilkan detailnya
     final primaryGoal = activeGoals.first;
-    final int extraCount = activeGoals.length - 1;
-    
-    // Hitung progress untuk goal utama
     int completedTasks = primaryGoal.tasks.where((t) => t.isCompleted).length;
     int totalTasks = primaryGoal.tasks.length;
     double percentage = totalTasks == 0 ? 0.0 : completedTasks / totalTasks;
 
-    return RetroCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Goal in Progress',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const GoalsHomeScreen())),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: _cardDecoration(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Goal in Progress', style: TextStyle(color: Color(0xFF7F8C8D), fontWeight: FontWeight.w600, fontSize: 12)),
+                if (activeGoals.length > 1)
+                  Text('+${activeGoals.length - 1} more', style: const TextStyle(color: Color(0xFF6C63FF), fontSize: 11, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(primaryGoal.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50))),
+            const SizedBox(height: 12),
+            LinearProgressIndicator(
+              value: percentage,
+              backgroundColor: const Color(0xFF6C63FF).withOpacity(0.1),
+              color: const Color(0xFF6C63FF),
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('$completedTasks/$totalTasks tasks', style: const TextStyle(fontSize: 12, color: Color(0xFF7F8C8D))),
+                Text('${(percentage * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6C63FF), fontSize: 12)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuAction({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required List<Color> colors,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: _cardDecoration(),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: colors),
+                borderRadius: BorderRadius.circular(14),
               ),
-              // Penjelasan ringkas jika ada lebih dari 1 goal
-              if (extraCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: kButtonColor, // Menggunakan warna tema beige/tombol
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.black12)
-                  ),
-                  child: Text(
-                    '+$extraCount others',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          
-          // Judul Goal Utama
-          Text(
-            primaryGoal.title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          
-          const SizedBox(height: 5),
-          CustomProgressBar(
-            percentage: percentage,
-          ),
-          const SizedBox(height: 5),
-          
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '$completedTasks/$totalTasks Task Complete',
-                style: const TextStyle(fontSize: 12),
-              ),
-              Text('(${(percentage * 100).toInt()}% Done)', style: const TextStyle(fontSize: 12)),
-            ],
-          ),
-          
-          const SizedBox(height: 15),
-          RetroButton(
-            text: 'Go to Goals',
-            isFullWidth: true,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const GoalsHomeScreen(),
+              child: Icon(icon, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF2C3E50))),
+                  Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF7F8C8D))),
+                ],
               ),
             ),
-          ),
-        ],
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xFFBDC3C7)),
+          ],
+        ),
       ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.03),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
     );
   }
 }
