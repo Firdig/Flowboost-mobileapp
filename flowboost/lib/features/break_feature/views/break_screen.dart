@@ -64,94 +64,48 @@ class _BreakScreenState extends State<BreakScreen> with SingleTickerProviderStat
     final screenWidth = MediaQuery.of(context).size.width;
     
     return Scaffold(
-      backgroundColor: _getBackgroundColor(),
+      backgroundColor: const Color(0xFFF5F5DC), // Background Beige sesuai tema
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF3E4F3C), // Hijau Gelap (Sesuai Dashboard/Pomodoro)
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Take a Break',
+          style: TextStyle(
+            color: Colors.white, // Teks Putih agar kontras
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: 1.0,
+          ),
+        ),
+      ),
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            _buildAppBar(context),
-            SliverToBoxAdapter(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Column(
-                    children: [
-                      _buildHeaderSection(screenHeight, screenWidth),
-                      _buildDivider(),
-                      _buildActivitiesSection(context, screenWidth),
-                      _buildBottomSpacing(),
-                    ],
-                  ),
-                ),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  _buildHeaderSection(screenHeight, screenWidth),
+                  _buildDivider(),
+                  _buildActivitiesSection(context, screenWidth),
+                  _buildBottomSpacing(),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getBackgroundColor() {
-    return const Color(0xFFF5F5DC); // Beige sesuai gambar
-  }
-
-  SliverAppBar _buildAppBar(BuildContext context) {
-    return SliverAppBar(
-      expandedHeight: 80,
-      floating: false,
-      pinned: true,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      leading: _buildBackButton(context),
-      flexibleSpace: FlexibleSpaceBar(
-        titlePadding: const EdgeInsets.only(left: 56, bottom: 16),
-        title: _buildAppBarTitle(),
-        centerTitle: false,
-      ),
-    );
-  }
-
-  Widget _buildBackButton(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
           ),
-        ],
-      ),
-      child: IconButton(
-        icon: const Icon(
-          Icons.arrow_back_ios_new,
-          color: Color(0xFF2C3E50),
-          size: 18,
         ),
-        onPressed: () => _handleBackNavigation(context),
       ),
     );
   }
 
-  void _handleBackNavigation(BuildContext context) {
-    Navigator.pop(context);
-  }
-
-  Widget _buildAppBarTitle() {
-    return const Text(
-      'Take a Break',
-      style: TextStyle(
-        color: Color(0xFF2C3E50),
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
-      ),
-    );
-  }
+  // --- HEADER SECTION (Updated UI) ---
 
   Widget _buildHeaderSection(double screenHeight, double screenWidth) {
     return Container(
@@ -177,18 +131,11 @@ class _BreakScreenState extends State<BreakScreen> with SingleTickerProviderStat
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF6C63FF).withOpacity(0.1),
-            const Color(0xFF4CAF50).withOpacity(0.1),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white, // Background putih agar lebih clean di atas beige
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6C63FF).withOpacity(0.2),
+            color: const Color(0xFF6C63FF).withOpacity(0.15),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -196,7 +143,7 @@ class _BreakScreenState extends State<BreakScreen> with SingleTickerProviderStat
       ),
       child: const Icon(
         Icons.notifications_active_outlined,
-        size: 56,
+        size: 50,
         color: Color(0xFF6C63FF),
       ),
     );
@@ -206,7 +153,7 @@ class _BreakScreenState extends State<BreakScreen> with SingleTickerProviderStat
     return const Text(
       'Time for a Break!',
       style: TextStyle(
-        fontSize: 32,
+        fontSize: 28, // Sedikit disesuaikan
         fontWeight: FontWeight.bold,
         color: Color(0xFF2C3E50),
         letterSpacing: -0.5,
@@ -277,6 +224,8 @@ class _BreakScreenState extends State<BreakScreen> with SingleTickerProviderStat
       ),
     );
   }
+
+  // --- ACTIVITY SECTION (Fungsionalitas Tetap) ---
 
   Widget _buildActivitiesSection(BuildContext context, double screenWidth) {
     return Padding(

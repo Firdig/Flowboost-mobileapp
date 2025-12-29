@@ -9,7 +9,11 @@ class VideoAllListScreen extends StatefulWidget {
   State<VideoAllListScreen> createState() => _VideoAllListScreenState();
 }
 
-class _VideoAllListScreenState extends State<VideoAllListScreen> {
+class _VideoAllListScreenState extends State<VideoAllListScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   String _selectedCategory = 'Semua';
   final List<String> _categories = [
     'Semua',
@@ -22,25 +26,49 @@ class _VideoAllListScreenState extends State<VideoAllListScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _initializeAnimations();
+  }
+
+  void _initializeAnimations() {
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final List<Map<String, dynamic>> allVideos = _getAllVideos();
     final filteredVideos = _selectedCategory == 'Semua'
         ? allVideos
-        : allVideos
-              .where((video) => video['category'] == _selectedCategory)
-              .toList();
+        : allVideos.where((video) => video['category'] == _selectedCategory).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFEFAE0),
+      backgroundColor: const Color(0xFFF5F5DC), // Background Beige (Tema Dashboard)
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFEFAE0),
+        backgroundColor: const Color(0xFF3E4F3C), // Hijau Gelap
         elevation: 0,
+        centerTitle: false,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.black87,
-            size: 20,
-          ),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -49,118 +77,132 @@ class _VideoAllListScreenState extends State<VideoAllListScreen> {
             const Text(
               'KOLEKSI VIDEO',
               style: TextStyle(
-                color: Colors.black87,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.0,
               ),
             ),
             Text(
               '${filteredVideos.length} Video Tersedia',
-              style: TextStyle(
-                color: Colors.black.withValues(alpha: 0.5),
-                fontSize: 11,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
                 fontWeight: FontWeight.w400,
               ),
             ),
           ],
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
+          preferredSize: const Size.fromHeight(70),
           child: Container(
-            height: 60,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: ListView.builder(
+            height: 70,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               itemCount: _categories.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
                 final category = _categories[index];
                 final isSelected = _selectedCategory == category;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    selected: isSelected,
-                    label: Text(category),
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedCategory = category;
-                      });
-                    },
-                    backgroundColor: Colors.white,
-                    selectedColor: const Color(0xFFCCD5AE),
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.black87 : Colors.black54,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      fontSize: 12,
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: BorderSide(
-                        color: isSelected
-                            ? const Color(0xFFCCD5AE)
-                            : Colors.black.withValues(alpha: 0.1),
-                        width: 1.5,
-                      ),
-                    ),
-                    checkmarkColor: Colors.black87,
-                  ),
-                );
+                return _buildFilterChip(category, isSelected);
               },
             ),
           ),
         ),
       ),
-      body: filteredVideos.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.video_library_outlined,
-                    size: 80,
-                    color: Colors.black.withValues(alpha: 0.2),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Tidak ada video di kategori ini',
-                    style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: filteredVideos.length,
-              itemBuilder: (context, index) {
-                final video = filteredVideos[index];
-                return _buildVideoCard(
-                  context,
-                  index: index,
-                  title: video['title'],
-                  duration: video['duration'],
-                  category: video['category'],
-                  categoryColor: video['categoryColor'],
-                  videoUrl: video['videoUrl'],
-                  description: video['description'],
-                  thumbnail: video['thumbnail'],
-                );
-              },
-            ),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: filteredVideos.isEmpty
+              ? _buildEmptyState()
+              : ListView.separated(
+                  padding: const EdgeInsets.all(24),
+                  itemCount: filteredVideos.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final video = filteredVideos[index];
+                    return _buildModernVideoCard(
+                      context,
+                      index: index,
+                      title: video['title'],
+                      duration: video['duration'],
+                      category: video['category'],
+                      categoryColor: video['categoryColor'],
+                      videoUrl: video['videoUrl'],
+                      description: video['description'],
+                      thumbnail: video['thumbnail'],
+                    );
+                  },
+                ),
+        ),
+      ),
     );
   }
 
-  Widget _buildVideoCard(
+  Widget _buildFilterChip(String label, bool isSelected) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategory = label;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF6C63FF) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            if (!isSelected)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF2C3E50),
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 80,
+            color: const Color(0xFF7F8C8D).withOpacity(0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Tidak ada video di kategori ini',
+            style: TextStyle(
+              color: const Color(0xFF2C3E50).withOpacity(0.7),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernVideoCard(
     BuildContext context, {
     required int index,
     required String title,
@@ -172,25 +214,14 @@ class _VideoAllListScreenState extends State<VideoAllListScreen> {
     required String thumbnail,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: categoryColor.withValues(alpha: 0.2),
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: categoryColor.withValues(alpha: 0.08),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -209,286 +240,128 @@ class _VideoAllListScreenState extends State<VideoAllListScreen> {
               ),
             );
           },
-          borderRadius: BorderRadius.circular(16),
-          splashColor: categoryColor.withValues(alpha: 0.1),
-          highlightColor: categoryColor.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Thumbnail with Enhanced Design
+                // 🖼️ Thumbnail Section
                 Stack(
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: CachedNetworkImage(
                         imageUrl: thumbnail,
-                        width: 140,
-                        height: 100,
+                        width: 120,
+                        height: 90,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => Container(
-                          width: 140,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                categoryColor.withValues(alpha: 0.3),
-                                categoryColor.withValues(alpha: 0.1),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          width: 120,
+                          height: 90,
+                          color: categoryColor.withOpacity(0.1),
                           child: Center(
                             child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                categoryColor,
-                              ),
+                              strokeWidth: 2,
+                              color: categoryColor,
                             ),
                           ),
                         ),
                         errorWidget: (context, url, error) => Container(
-                          width: 140,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                categoryColor.withValues(alpha: 0.3),
-                                categoryColor.withValues(alpha: 0.1),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.image_not_supported_outlined,
-                                color: categoryColor,
-                                size: 32,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'No Image',
-                                style: TextStyle(
-                                  color: categoryColor,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
+                          width: 120,
+                          height: 90,
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
                         ),
                       ),
                     ),
-                    // Gradient Overlay
-                    Container(
-                      width: 140,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.4),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Play Button
+                    
+                    // Play Button Overlay
                     Positioned.fill(
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.3),
-                                blurRadius: 6,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.play_arrow_rounded,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.play_circle_fill,
                             size: 32,
                             color: Colors.white,
                           ),
                         ),
                       ),
                     ),
+
                     // Duration Badge
                     Positioned(
                       bottom: 6,
                       right: 6,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.8),
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 3,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.access_time_rounded,
-                              size: 10,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              duration,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // Video Number
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: categoryColor,
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                              color: categoryColor.withValues(alpha: 0.4),
-                              blurRadius: 4,
-                            ),
-                          ],
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '#${index + 1}',
+                          duration,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(width: 12),
-                // Content Section
+                const SizedBox(width: 16),
+                
+                // 📝 Content Section
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Category Badge
+                      // Category Tag
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: categoryColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: categoryColor.withValues(alpha: 0.3),
-                            width: 1,
-                          ),
+                          color: categoryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _getCategoryIcon(category),
-                              size: 10,
-                              color: categoryColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                category.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  color: categoryColor,
-                                  letterSpacing: 0.5,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          category.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: categoryColor,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // Title
+                      
                       Text(
                         title,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                          height: 1.3,
+                          color: Color(0xFF2C3E50),
+                          height: 1.2,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 6),
-                      // Description
+                      const SizedBox(height: 4),
                       Text(
                         description,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 11,
-                          color: Colors.black.withValues(alpha: 0.6),
+                          color: Color(0xFF7F8C8D),
                           height: 1.3,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      // Stats Row
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.remove_red_eye_outlined,
-                            size: 12,
-                            color: categoryColor,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${_formatViews((index + 1) * 1234)}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: categoryColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const Spacer(),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: categoryColor,
-                            size: 20,
-                          ),
-                        ],
                       ),
                     ],
                   ),
@@ -499,25 +372,6 @@ class _VideoAllListScreenState extends State<VideoAllListScreen> {
         ),
       ),
     );
-  }
-
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Motivasi Kerja':
-        return Icons.work_outline_rounded;
-      case 'Motivasi Pagi':
-        return Icons.wb_sunny_outlined;
-      case 'Motivasi Belajar':
-        return Icons.school_outlined;
-      case 'Motivasi Hidup':
-        return Icons.favorite_outline_rounded;
-      case 'Quotes Inspiratif':
-        return Icons.format_quote_rounded;
-      case 'Sukses Bisnis':
-        return Icons.trending_up_rounded;
-      default:
-        return Icons.video_library_outlined;
-    }
   }
 
   String _formatViews(int views) {

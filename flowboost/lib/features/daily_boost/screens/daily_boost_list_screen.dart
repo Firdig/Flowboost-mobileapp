@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'daily_boost_player_screen.dart';
 
-class VideoListScreen extends StatelessWidget {
+class VideoListScreen extends StatefulWidget {
   final String categoryName;
   final Color categoryColor;
 
@@ -13,59 +13,120 @@ class VideoListScreen extends StatelessWidget {
   });
 
   @override
+  State<VideoListScreen> createState() => _VideoListScreenState();
+}
+
+class _VideoListScreenState extends State<VideoListScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAnimations();
+  }
+
+  void _initializeAnimations() {
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final List<Map<String, String>> videos = _getVideosByCategory(categoryName);
+    final List<Map<String, String>> videos = _getVideosByCategory(widget.categoryName);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFEFAE0),
+      backgroundColor: const Color(0xFFF5F5DC), // Background Beige (Tema Dashboard)
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFEFAE0),
+        backgroundColor: const Color(0xFF3E4F3C), // Hijau Gelap
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          categoryName.toUpperCase(),
+          widget.categoryName.toUpperCase(),
           style: const TextStyle(
-            color: Colors.black87,
+            color: Colors.white,
             fontSize: 16,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
           ),
         ),
-        centerTitle: true,
       ),
-      body: videos.isEmpty
-          ? Center(
-              child: Text(
-                'Belum ada video tersedia',
-                style: TextStyle(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  fontSize: 14,
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: videos.isEmpty
+              ? _buildEmptyState()
+              : ListView.separated(
+                  padding: const EdgeInsets.all(24),
+                  itemCount: videos.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 20),
+                  itemBuilder: (context, index) {
+                    final video = videos[index];
+                    return _buildModernVideoCard(
+                      context,
+                      index: index,
+                      title: video['title']!,
+                      duration: video['duration']!,
+                      thumbnail: video['thumbnail']!,
+                      videoUrl: video['videoUrl']!,
+                      description: video['description']!,
+                    );
+                  },
                 ),
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: videos.length,
-              itemBuilder: (context, index) {
-                final video = videos[index];
-                return _buildVideoCard(
-                  context,
-                  index: index,
-                  title: video['title']!,
-                  duration: video['duration']!,
-                  thumbnail: video['thumbnail']!,
-                  videoUrl: video['videoUrl']!,
-                  description: video['description']!,
-                );
-              },
-            ),
+        ),
+      ),
     );
   }
 
-  Widget _buildVideoCard(
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.ondemand_video,
+            size: 64,
+            color: const Color(0xFF7F8C8D).withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Belum ada video tersedia',
+            style: TextStyle(
+              color: const Color(0xFF2C3E50).withOpacity(0.7),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernVideoCard(
     BuildContext context, {
     required int index,
     required String title,
@@ -75,25 +136,14 @@ class VideoListScreen extends StatelessWidget {
     required String description,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: categoryColor.withValues(alpha: 0.2),
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: categoryColor.withValues(alpha: 0.1),
-            blurRadius: 8,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
             offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -112,296 +162,148 @@ class VideoListScreen extends StatelessWidget {
               ),
             );
           },
-          borderRadius: BorderRadius.circular(16),
-          splashColor: categoryColor.withValues(alpha: 0.1),
-          highlightColor: categoryColor.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Thumbnail Section with Enhanced Styling
+              // 🖼️ Thumbnail Section
               Stack(
                 children: [
                   ClipRRect(
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
+                      topLeft: Radius.circular(18),
+                      topRight: Radius.circular(18),
                     ),
                     child: CachedNetworkImage(
                       imageUrl: thumbnail,
                       width: double.infinity,
-                      height: 200,
+                      height: 180,
                       fit: BoxFit.cover,
                       placeholder: (context, url) => Container(
-                        width: double.infinity,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              categoryColor.withValues(alpha: 0.3),
-                              categoryColor.withValues(alpha: 0.1),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
+                        height: 180,
+                        color: widget.categoryColor.withOpacity(0.1),
                         child: Center(
                           child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              categoryColor,
-                            ),
+                            strokeWidth: 2,
+                            color: widget.categoryColor,
                           ),
                         ),
                       ),
                       errorWidget: (context, url, error) => Container(
-                        width: double.infinity,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              categoryColor.withValues(alpha: 0.3),
-                              categoryColor.withValues(alpha: 0.1),
-                            ],
+                        height: 180,
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.broken_image, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                  
+                  // Play Button Overlay
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.1),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(18),
+                          topRight: Radius.circular(18),
+                        ),
+                      ),
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.play_arrow_rounded,
+                            size: 32,
+                            color: widget.categoryColor,
                           ),
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.image_not_supported_outlined,
-                              color: categoryColor,
-                              size: 40,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Thumbnail tidak tersedia',
-                              style: TextStyle(
-                                color: categoryColor,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                   ),
-                  // Gradient Overlay
-                  Container(
-                    width: double.infinity,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.3),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Play Button
-                  Positioned.fill(
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow_rounded,
-                          size: 48,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
+
                   // Duration Badge
                   Positioned(
                     bottom: 12,
                     right: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.access_time_rounded,
-                            size: 12,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            duration,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Video Number Badge
-                  Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: categoryColor,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: categoryColor.withValues(alpha: 0.4),
-                            blurRadius: 4,
-                          ),
-                        ],
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '#${index + 1}',
+                        duration,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
-              // Content Section
+
+              // 📝 Content Section
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title
                     Text(
                       title,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: Color(0xFF2C3E50), // Dark Blue-Grey
                         height: 1.3,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 12),
-                    // Description
+                    const SizedBox(height: 8),
                     Text(
                       description,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.black.withValues(alpha: 0.65),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF7F8C8D), // Grey
                         height: 1.4,
                       ),
-                      maxLines: 3,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 12),
-                    // Stats and Action
+                    const SizedBox(height: 16),
+                    
+                    // Footer: Views & Action
                     Row(
                       children: [
-                        // Views Count
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEFAE0),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: categoryColor.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.remove_red_eye_outlined,
-                                size: 14,
-                                color: categoryColor,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${_formatViews((index + 1) * 1234)} views',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: categoryColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                        Icon(Icons.remove_red_eye, size: 14, color: widget.categoryColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_formatViews((index + 1) * 1234)} views',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: widget.categoryColor,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const Spacer(),
-                        // Watch Now Button
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: categoryColor,
+                            color: widget.categoryColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: categoryColor.withValues(alpha: 0.3),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'Tonton',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                            ],
+                          child: Text(
+                            'Tonton Sekarang',
+                            style: TextStyle(
+                              color: widget.categoryColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -425,6 +327,7 @@ class VideoListScreen extends StatelessWidget {
     return views.toString();
   }
 
+  // --- DATA TETAP DIPERTAHANKAN ---
   List<Map<String, String>> _getVideosByCategory(String category) {
     switch (category) {
       case 'Motivasi Kerja':
