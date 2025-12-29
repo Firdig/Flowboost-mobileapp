@@ -1,12 +1,12 @@
 // FILE: lib/features/Pomodoro/provider/pomodoro_provider.dart
-// ✅ VERSI FINAL - TANPA DUPLIKAT
+// ✅ VERSI FINAL - FIX SWITCH MODE (notifyListeners added)
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../goals/models/goal_model.dart'; // Import GoalModel
-import '../../goals/services/goal_service.dart'; // Import GoalService
+import '../../goals/models/goal_model.dart';
+import '../../goals/services/goal_service.dart';
 import '../models/pomodoro_task_model.dart';
 
 enum PomodoroMode { pomodoro, shortBreak, longBreak }
@@ -22,7 +22,6 @@ class PomodoroProvider with ChangeNotifier {
   List<GoalModel> _firestoreGoals = [];
   
   // --- FIRESTORE REFERENCE ---
-  // Mengambil koleksi berdasarkan User ID agar data private per user
   CollectionReference? get _pomodoroCollection {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
@@ -43,14 +42,14 @@ class PomodoroProvider with ChangeNotifier {
   Duration _shortBreakDuration = const Duration(minutes: 5);
   Duration _longBreakDuration = const Duration(minutes: 15);
 
-  // ✅ NEW: Auto Start Settings
+  // Auto Start Settings
   bool _autoStartBreak = false;
   bool _autoStartPomodoro = false;
 
   int _cycleCount = 0;
 
   // --- TASK STATE ---
-  List<PomodoroTask> _tasks = []; // Data akan diisi dari Firestore
+  List<PomodoroTask> _tasks = [];
   String? _selectedTaskId;
   String? _editingTaskId;
   final Set<String> _hiddenParentTaskIds = {};
@@ -58,10 +57,9 @@ class PomodoroProvider with ChangeNotifier {
   // Constructor
   PomodoroProvider() {
     _initGoalsListener();
-    _initPomodoroTasksListener(); // Jalankan listener task
+    _initPomodoroTasksListener();
   }
 
-  // Listener Goals (Kode sebelumnya)
   void _initGoalsListener() {
     _goalsSubscription = _goalService.getGoalsStream().listen((goals) {
       _firestoreGoals = goals;
@@ -69,7 +67,6 @@ class PomodoroProvider with ChangeNotifier {
     });
   }
 
-  // ✅ BARU: Listener untuk Pomodoro Tasks agar Realtime & Persisten
   void _initPomodoroTasksListener() {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -84,7 +81,6 @@ class PomodoroProvider with ChangeNotifier {
           return PomodoroTask.fromMap(doc.data());
         }).toList();
         
-        // Auto select task pertama jika belum ada yang dipilih dan list tidak kosong
         if (_selectedTaskId == null && _tasks.isNotEmpty) {
            _selectedTaskId = _tasks.first.id;
         }
@@ -101,8 +97,10 @@ class PomodoroProvider with ChangeNotifier {
     _timer?.cancel();
     super.dispose();
   }
+  
   // --- GETTERS ---
-  List<PomodoroTask> get tasks => _tasks; // Tampilkan semua task (filter hidden jika perlu)
+  List<PomodoroTask> get allTasks => _tasks;
+  List<PomodoroTask> get tasks => _tasks; 
   List<GoalModel> get firestoreGoals => _firestoreGoals;
   
   Duration get currentDuration => _currentDuration;
@@ -124,7 +122,7 @@ class PomodoroProvider with ChangeNotifier {
   }
   
   String? get editingTaskId => _editingTaskId;
-  bool get hasRunningTask => selectedTask != null; // Simplifikasi
+  bool get hasRunningTask => selectedTask != null;
 
   // --- TIMER LOGIC ---
   void toggleTimer() {
@@ -156,7 +154,6 @@ class PomodoroProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // ✅ UPDATE: Save progress ke Firestore saat sesi selesai
   void completeSession() {
     _timer?.cancel();
     _timer = null;
@@ -168,14 +165,12 @@ class PomodoroProvider with ChangeNotifier {
       if (task.completedSessions >= task.targetSessions) {
         task.isDone = true;
       }
-      // Update ke Firestore
       _updateTaskInFirestore(task);
     }
 
     _handleModeSwitch();
   }
   
-  // ✅ UPDATE: Save progress ke Firestore saat skip
   void skipTimer() {
     _timer?.cancel();
     _timer = null;
@@ -187,7 +182,7 @@ class PomodoroProvider with ChangeNotifier {
       if (task.completedSessions >= task.targetSessions) {
         task.isDone = true;
       }
-      _updateTaskInFirestore(task); // Simpan
+      _updateTaskInFirestore(task);
     }
     
     _handleModeSwitch();
@@ -203,25 +198,30 @@ class PomodoroProvider with ChangeNotifier {
         setMode(PomodoroMode.shortBreak);
       }
       if (_autoStartBreak) startTimer();
-      else notifyListeners();
+      else notifyListeners(); // Pastikan notify jika auto start false
     } else {
       setMode(PomodoroMode.pomodoro);
       if (_autoStartPomodoro) startTimer();
-      else notifyListeners();
+      else notifyListeners(); // Pastikan notify jika auto start false
     }
   }
 
   void setMode(PomodoroMode mode) {
+    // Opsional: Pause timer saat ganti mode manual agar tidak langsung jalan
+    // Jika Anda ingin timer terus jalan saat ganti mode, hapus baris ini.
+    if (_isRunning) pauseTimer(); 
+
     _currentMode = mode;
     switch (mode) {
       case PomodoroMode.pomodoro: _currentDuration = _pomodoroDuration; break;
       case PomodoroMode.shortBreak: _currentDuration = _shortBreakDuration; break;
       case PomodoroMode.longBreak: _currentDuration = _longBreakDuration; break;
     }
-    // notifyListeners() dipanggil oleh parent
+    
+    // ✅ FIX UTAMA: Tambahkan ini agar UI update saat timer berhenti
+    notifyListeners(); 
   }
 
-  // ✅ UPDATE SETTINGS DARI POPUP
   void updateSettings({
     required int pomodoroMinutes,
     required int shortBreakMinutes,
@@ -235,19 +235,12 @@ class PomodoroProvider with ChangeNotifier {
     _autoStartBreak = autoStartBreak;
     _autoStartPomodoro = autoStartPomodoro;
 
-    // Reset timer saat ini ke settingan baru jika tidak sedang berjalan
     if (!_isRunning) {
       setMode(_currentMode); 
     }
     
     notifyListeners();
   }
-
-  // void toggleEditTimerUi() {
-  //   _isEditingTimerUi = !_isEditingTimerUi;
-  //   pauseTimer();
-  //   notifyListeners();
-  // }
 
   void adjustTime(int minutesDelta, int secondsDelta) {
     final newDuration = _currentDuration + Duration(minutes: minutesDelta, seconds: secondsDelta);
@@ -256,36 +249,16 @@ class PomodoroProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
-  // void saveTimerSetting() {
-  //   // _isEditingTimerUi = false;
-    
-  //   // Simpan durasi saat ini ke variabel setting mode yang sedang aktif
-  //   switch (_currentMode) {
-  //     case PomodoroMode.pomodoro:
-  //       _pomodoroDuration = _currentDuration;
-  //       break;
-  //     case PomodoroMode.shortBreak:
-  //       _shortBreakDuration = _currentDuration;
-  //       break;
-  //     case PomodoroMode.longBreak:
-  //       _longBreakDuration = _currentDuration;
-  //       break;
-  //   }
-  //   notifyListeners();
-  // }
-
   
   // --- TASK LOGIC ---
   void selectTask(String taskId) {
     _selectedTaskId = taskId;
-    pauseTimer();
-    setMode(PomodoroMode.pomodoro); // Reset ke mode kerja saat ganti task
-    notifyListeners();
+    // pauseTimer(); // setMode di bawah sudah memanggil pauseTimer()
+    setMode(PomodoroMode.pomodoro); 
+    // notifyListeners(); // setMode di atas sudah memanggil notifyListeners()
   }
 
   void startAddingTask() {
-    // Kita buat task lokal sementara untuk UI editing
     final newTask = PomodoroTask(title: '', targetSessions: 1);
     _tasks.add(newTask);
     _editingTaskId = newTask.id;
@@ -299,11 +272,13 @@ class PomodoroProvider with ChangeNotifier {
 
   void cancelEditingTask() {
     if (_editingTaskId != null) {
-      // Hapus dari list lokal jika belum disimpan (belum ada di DB)
-      // Cek apakah task ini ada di Firestore? Kalau task baru (title kosong), hapus.
-      final task = _tasks.firstWhere((t) => t.id == _editingTaskId);
-      if (task.title.isEmpty) {
-        _tasks.removeWhere((t) => t.id == _editingTaskId);
+      try {
+        final task = _tasks.firstWhere((t) => t.id == _editingTaskId);
+        if (task.title.isEmpty) {
+          _tasks.removeWhere((t) => t.id == _editingTaskId);
+        }
+      } catch (e) {
+        // Handle jika task tidak ditemukan
       }
     }
     _editingTaskId = null;
@@ -319,7 +294,6 @@ class PomodoroProvider with ChangeNotifier {
       task.note = newNote;
       task.isDone = (task.completedSessions >= task.targetSessions);
 
-      // Simpan ke Firestore
       if (_pomodoroCollection != null) {
         await _pomodoroCollection!.doc(id).set(task.toMap());
       }
@@ -330,15 +304,10 @@ class PomodoroProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // ✅ Tambah task baru dan sembunyikan semua task induk
   Future<String> addNewTask(String title, int targetSessions, String? note) async {
-    print('🆕 addNewTask called - Title: $title');
-
-    // Sembunyikan semua task induk (yang punya subtasks)
     for (var task in _tasks) {
       if (task.subTasks != null && task.subTasks!.isNotEmpty) {
         _hiddenParentTaskIds.add(task.id);
-        print('🙈 Hiding parent task: ${task.title} (ID: ${task.id})');
       }
     }
 
@@ -349,25 +318,18 @@ class PomodoroProvider with ChangeNotifier {
       note: note,
     );
 
-    // Simpan ke Firestore
     if (_pomodoroCollection != null) {
       await _pomodoroCollection!.doc(newTask.id).set(newTask.toMap());
     }
     _selectedTaskId = newTask.id;
     _editingTaskId = null;
 
-    print('✅ New task added: $title');
-    print('📋 Visible tasks: ${tasks.length}');
-    print('🔒 Hidden parent tasks: ${_hiddenParentTaskIds.length}');
-
     notifyListeners();
     return newTask.id;
   }
 
-  // ✅ Tampilkan kembali semua task induk
   void showAllParentTasks() {
     _hiddenParentTaskIds.clear();
-    print('👁️ All parent tasks are now visible');
     notifyListeners();
   }
 
@@ -383,42 +345,13 @@ class PomodoroProvider with ChangeNotifier {
     if (index != -1) {
       final task = _tasks[index];
       task.isDone = !task.isDone;
-      _updateTaskInFirestore(task); // Simpan perubahan
+      _updateTaskInFirestore(task);
     }
   }
-Future<void> _updateTaskInFirestore(PomodoroTask task) async {
+  
+  Future<void> _updateTaskInFirestore(PomodoroTask task) async {
     if (_pomodoroCollection != null) {
       await _pomodoroCollection!.doc(task.id).update(task.toMap());
     }
   }
-  // --- GOAL TASK LOGIC ---
-  // void setGoalTaskAsCurrent(PomodoroTask goalTask) {
-  //   _currentGoalTask = goalTask;
-  //   _selectedTaskId = goalTask.id;
-  //   setMode(PomodoroMode.pomodoro);
-  //   notifyListeners();
-  // }
-
-  // void replaceCurrentTask(PomodoroTask newGoalTask) {
-  //   pauseTimer();
-  //   _currentGoalTask = newGoalTask;
-  //   _selectedTaskId = newGoalTask.id;
-  //   setMode(PomodoroMode.pomodoro);
-  //   notifyListeners();
-  // }
-
-  // void addTaskToQueue(PomodoroTask goalTask) {
-  //   _taskQueue.add(goalTask);
-  //   notifyListeners();
-  // }
-
-  // void startNextTaskFromQueue() {
-  //   if (_taskQueue.isNotEmpty) {
-  //     final nextTask = _taskQueue.removeAt(0);
-  //     setGoalTaskAsCurrent(nextTask);
-  //   } else {
-  //     _currentGoalTask = null;
-  //     notifyListeners();
-  //   }
-  // }
 }
