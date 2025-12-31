@@ -59,19 +59,34 @@ class MyApp extends StatelessWidget {
         home: StreamBuilder<User?>(
           stream: AuthService().authStateChanges(),
           builder: (context, snapshot) {
-            // Jika koneksi masih loading (misal: saat startup)
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+              // Tampilan Loading yang sesuai tema
+              return Scaffold(
+                backgroundColor: const Color.fromARGB(248, 250, 232, 197), // Gunakan warna krem
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Tampilkan Logo Aplikasi
+                      Image.asset(
+                        'assets/images/flowboost_logo4.png',
+                        width: 150,
+                      ),
+                      const SizedBox(height: 200),
+                      // Loading indicator dengan warna hijau sage
+                      const CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(kAppBarColor),
+                      ),
+                    ],
+                  ),
+                ),
               );
             }
             
-            // Jika ada data user, berarti sudah login sebelumnya
             if (snapshot.hasData) {
               return const MainScaffold();
             }
             
-            // Jika tidak ada data user, tampilkan halaman login
             return const FlowboostLoginScreen();
           },
         ),
