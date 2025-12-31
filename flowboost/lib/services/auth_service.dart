@@ -42,25 +42,40 @@ class AuthService {
 
   // ===== GOOGLE =====
   // Native: pakai google_sign_in; Web: pakai signInWithPopup
+  // File: lib/services/auth_service.dart
+
   Future<UserCredential> signInWithGoogle() async {
+    // 1. Web Handling
     if (kIsWeb) {
       final googleProvider = GoogleAuthProvider();
       return _auth.signInWithPopup(googleProvider);
     }
 
-    // Trigger the authentication flow
-    final GoogleSignInAccount googleUser =
-        await GoogleSignIn.instance.authenticate();
+    try {
+      // 2. Trigger flow login (Versi Baru: authenticate)
+      // Method ini akan melempar error jika user membatalkan login (klik silang/back)
+      final GoogleSignInAccount googleUser = await GoogleSignIn.instance.authenticate();
 
-    // Obtain auth details
-    final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      // 3. Ambil detail otentikasi
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
 
-    // Create credential (Firebase)
-    final credential = GoogleAuthProvider.credential(
-      idToken: googleAuth.idToken,
-    );
+      // 4. Buat credential Firebase
+      // PENTING: Di versi baru, cukup gunakan idToken. accessToken tidak wajib/tidak tersedia.
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+        accessToken: null, 
+      );
 
-    return _auth.signInWithCredential(credential);
+      // 5. Login ke Firebase
+      return _auth.signInWithCredential(credential);
+      
+    } catch (e) {
+      // Tangkap error spesifik pembatalan atau error lainnya
+      throw FirebaseAuthException(
+        code: 'GOOGLE_SIGN_IN_FAILED',
+        message: 'Gagal login Google: $e',
+      );
+    }
   }
 
   // ===== FACEBOOK =====
@@ -99,7 +114,6 @@ class AuthService {
     // opsional tapi disarankan untuk “bersih”
     if (!kIsWeb) {
       await GoogleSignIn.instance.signOut();
-      await FacebookAuth.instance.logOut();
     }
   }
 }

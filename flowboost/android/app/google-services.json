@@ -12,7 +12,12 @@
           "package_name": "com.company.flowboost"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "548165128046-ftumrlojgataejgkhsg9rmh4qbjqeu0f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCZe35crb2e-39j5WGCWYD8CbXK4Rrftlw"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "548165128046-ftumrlojgataejgkhsg9rmh4qbjqeu0f.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "548165128046-nvac2garral0554rltkchs8k0bcik1nu.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.flowboost"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +48,20 @@
           "package_name": "com.example.flowboost"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "548165128046-8u1tbfgifglmjpd8oqrvlqi01665a6v3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.flowboost",
+            "certificate_hash": "f06219783763ca9d6c0205dd58ee2132f5a4ca8f"
+          }
+        },
+        {
+          "client_id": "548165128046-ftumrlojgataejgkhsg9rmh4qbjqeu0f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCZe35crb2e-39j5WGCWYD8CbXK4Rrftlw"
@@ -39,7 +69,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "548165128046-ftumrlojgataejgkhsg9rmh4qbjqeu0f.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "548165128046-nvac2garral0554rltkchs8k0bcik1nu.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.flowboost"
+              }
+            }
+          ]
         }
       }
     }

@@ -7,12 +7,17 @@ import 'firebase_options.dart';
 import 'features/authentication/register/views/register.dart';
 import 'features/authentication/login/views/login.dart';
 import 'features/Pomodoro/provider/pomodoro_provider.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+
   runApp(const MyApp());
 }
 
@@ -23,9 +28,11 @@ class MyApp extends StatelessWidget {
   @override
  Widget build(BuildContext context) {
     // ✅ BUNGKUS DENGAN MULTIPROVIDER DI SINI
-    return MultiProvider(
+   return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => PomodoroProvider()),
+        // Anda juga bisa mendaftarkan AuthService sebagai provider jika diperlukan
+        Provider(create: (_) => AuthService()),
       ],
       child: MaterialApp(
         title: 'Flowboost',
@@ -48,7 +55,26 @@ class MyApp extends StatelessWidget {
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade400)),
           ),
         ),
-        home: const FlowboostLoginScreen(),
+        // PERBAIKAN: Gunakan StreamBuilder untuk mengecek status login
+        home: StreamBuilder<User?>(
+          stream: AuthService().authStateChanges(),
+          builder: (context, snapshot) {
+            // Jika koneksi masih loading (misal: saat startup)
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            
+            // Jika ada data user, berarti sudah login sebelumnya
+            if (snapshot.hasData) {
+              return const MainScaffold();
+            }
+            
+            // Jika tidak ada data user, tampilkan halaman login
+            return const FlowboostLoginScreen();
+          },
+        ),
       ),
     );
   }
