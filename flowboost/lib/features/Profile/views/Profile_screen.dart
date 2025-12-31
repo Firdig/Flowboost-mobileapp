@@ -230,7 +230,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                     crossAxisCount: 2,
                                     shrinkWrap: true,
                                     physics: const NeverScrollableScrollPhysics(),
-                                    childAspectRatio: 1.4,
+                                    // PERBAIKAN: Perkecil ratio agar kartu sedikit lebih tinggi (mencegah overflow)
+                                    childAspectRatio: 1.3, 
                                     crossAxisSpacing: 15,
                                     mainAxisSpacing: 15,
                                     children: [
@@ -398,7 +399,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   Widget _buildStatCard(String title, String count, IconData icon, List<Color> gradient) {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(12), // Padding sedikit dikurangi agar lebih lega
       decoration: _commonDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,25 +413,35 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
             child: Icon(icon, color: Colors.white, size: 20),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                count, 
-                style: const TextStyle(
-                  fontSize: 22, 
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2C3E50)
-                )
-              ),
-              Text(
-                title, 
-                style: const TextStyle(
-                  fontSize: 12, 
-                  color: Color(0xFF95A5A6)
-                )
-              ),
-            ],
+          const SizedBox(height: 8), // Jarak antar elemen
+          Expanded( // Gunakan Expanded agar bagian teks mengambil sisa ruang
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // PERBAIKAN: Gunakan FittedBox agar angka tidak overflow jika terlalu besar
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    count, 
+                    style: const TextStyle(
+                      fontSize: 20, // Sedikit dikurangi dari 22
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2C3E50)
+                    )
+                  ),
+                ),
+                Text(
+                  title, 
+                  maxLines: 1, // Pastikan hanya satu baris
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11, // Sedikit dikurangi dari 12
+                    color: Color(0xFF95A5A6)
+                  )
+                ),
+              ],
+            ),
           )
         ],
       ),

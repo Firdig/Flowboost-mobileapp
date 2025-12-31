@@ -2,7 +2,6 @@ import 'package:flowboost/features/Profile/views/Profile_screen.dart';
 import 'package:flutter/material.dart';
 import '../../common/constants/constants.dart';
 import 'views/dashboard_screen.dart';
-import '../Profile/views/Profile_screen.dart';
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
@@ -28,19 +27,31 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_selectedIndex],
+      // Bungkus body dengan SafeArea agar konten atas tidak tertutup status bar/notch
+      body: SafeArea(
+        child: _pages[_selectedIndex],
+      ),
+      // Gunakan SafeArea di Bottom Navigation Bar agar tidak tertutup tombol sistem
       bottomNavigationBar: Container(
-        height: 80,
         decoration: const BoxDecoration(
           color: kAppBarColor,
-          borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20), 
+            topRight: Radius.circular(20)
+          ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(Icons.home_filled, 0),
-            _buildNavItem(Icons.person, 1),
-          ],
+        child: SafeArea(
+          child: Container(
+            height: 70, // Tinggi dikurangi sedikit karena sudah ada padding dari SafeArea
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(Icons.home_filled, 0),
+                _buildNavItem(Icons.person, 1),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -51,13 +62,15 @@ class _MainScaffoldState extends State<MainScaffold> {
     return GestureDetector(
       onTap: () => _onItemTapped(index),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
           shape: BoxShape.circle,
-          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))] : [],
+          boxShadow: isSelected 
+              ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))] 
+              : [],
         ),
-        child: Icon(icon, size: 30, color: Colors.black),
+        child: Icon(icon, size: 28, color: Colors.black),
       ),
     );
   }
