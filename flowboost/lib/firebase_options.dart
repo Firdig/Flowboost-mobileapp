@@ -41,7 +41,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAPQHWhDhqXWjVarAuIH2Sb7MMOOqLXhmI',
+    apiKey: 'YOUR-API-KEY',
     appId: '1:548165128046:web:f433c35935d3df874dbb7f',
     messagingSenderId: '548165128046',
     projectId: 'flowboost-91bd0',
@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCZe35crb2e-39j5WGCWYD8CbXK4Rrftlw',
+    apiKey: 'YOUR-API-KEY',
     appId: '1:548165128046:android:42091281d006bfd54dbb7f',
     messagingSenderId: '548165128046',
     projectId: 'flowboost-91bd0',
@@ -59,7 +59,7 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyC7ljM69b-PYwP5AjwDKEU7a2BfSOnHUk4',
+    apiKey: 'YOUR-API-KEY',
     appId: '1:548165128046:ios:dc9b236e1ee677384dbb7f',
     messagingSenderId: '548165128046',
     projectId: 'flowboost-91bd0',
